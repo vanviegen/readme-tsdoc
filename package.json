@@ -1,0 +1,44 @@
+{
+  "name": "readme-tsdoc",
+  "version": "1.0.0",
+  "description": "Automatically generate TypeScript documentation and insert it into your README.md file",
+  "main": "readme-tsdoc.js",
+  "type": "module",
+  "bin": {
+    "readme-tsdoc": "./readme-tsdoc.js"
+  },
+  "scripts": {
+    "start": "node readme-tsdoc.js",
+    "update-readme": "node readme-tsdoc.js",
+    "prepublishOnly": "npm run update-readme",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "typescript",
+    "documentation",
+    "readme",
+    "tsdoc",
+    "markdown",
+    "docs"
+  ],
+  "author": "Frank van Viegen",
+  "license": "ISC",
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "dependencies": {
+    "typescript": "^5.0.0"
+  },
+  "files": [
+    "readme-tsdoc.js",
+    "README.md"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vanviegen/readme-tsdoc.git"
+  },
+  "bugs": {
+    "url": "https://github.com/vanviegen/readme-tsdoc/issues"
+  },
+  "homepage": "https://github.com/vanviegen/readme-tsdoc#README.md"
+}
