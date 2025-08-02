@@ -591,7 +591,7 @@ export function updateReadme(readmePath, searchPhrase, repoUrl) {
     const escapedSearchPhrase = searchPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const markerRegex = new RegExp(
         `(^(#{1,6})\\s+)?` +
-        `(.*?\n${escapedSearchPhrase}[ \`]*([^\`]+)[\`: ]*\\n)`,
+        `(.*?\n${escapedSearchPhrase}[ \`]*([^\`: ]+)[\`: ]*\\n)`,
         'gm'
     );
     
@@ -616,9 +616,9 @@ export function updateReadme(readmePath, searchPhrase, repoUrl) {
         const newContent = generateMarkdownDoc(sourceFile, headingPrefix, repoUrl);
         
         const replacement = (precedingHeadingLevel ? `${'#'.repeat(precedingHeadingLevel.length)} ` : '') + 
-                          beforeSearch + newContent;
+                          beforeSearch + "\n" + newContent;
         
-        updatedReadme = updatedReadme.substring(0, match.index) + 
+        updatedReadme = updatedReadme.substring(0, match.index) +
                        replacement + 
                        updatedReadme.substring(contentEnd);
     }

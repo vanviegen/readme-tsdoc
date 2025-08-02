@@ -1,0 +1,77 @@
+#!/bin/bash
+
+# Test script for readme-tsdoc
+# This script tests the documentation generation by creating a test README,
+# running readme-tsdoc on it, and comparing the output to expected results.
+
+set -e  # Exit on any error
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Change into the project directory
+cd "$(dirname "${BASH_SOURCE[0]}")" || exit 1
+cd ..
+
+# Create the test output file with replacement markers
+cat > "test/kitchensink-output.md" << 'EOF'
+
+The following is auto-generated from test/trivial.ts:
+
+# Trivial
+
+The following is auto-generated from test/trivial.ts:
+
+## This section..
+
+should be replaced.
+
+# Trivial again
+
+## But at a
+
+### Deeper indent level
+
+And with a preceding comment.
+
+The following is auto-generated from test/trivial.ts:
+
+# Kitchen sink
+
+The following is auto-generated from test/kitchensink.ts
+EOF
+
+# Use the CLI to update the test README
+node src/cli.js \
+    --file "test/kitchensink-output.md" \
+    --repo-url "https://github.com/me/example"
+
+# Check if expected output file exists
+EXPECTED_FILE="test/kitchensink-expected.md"
+ACTUAL_FILE="test/kitchensink-output.md"
+
+if [ ! -f "$EXPECTED_FILE" ]; then
+    echo -e "${YELLOW}Warning: Expected output file $EXPECTED_FILE does not exist.${NC}"
+    exit 1
+fi
+
+# Use diff with color if available
+if diff "$EXPECTED_FILE" "$ACTUAL_FILE" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Test passed - output matches expected results${NC}"
+    exit 0
+else
+    echo -e "${RED}✗ Test failed - output differs from expected results${NC}"
+    echo ""
+    
+    diff -u --color=always "$EXPECTED_FILE" "$ACTUAL_FILE" || true
+    
+    echo -e "$YELLOW"
+    echo "To update the expected output (if the changes are correct):"
+    echo "  cp $ACTUAL_FILE $EXPECTED_FILE"
+    echo -e "$NC"
+
+    exit 1
+fi
