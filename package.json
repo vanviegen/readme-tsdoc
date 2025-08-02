@@ -9,7 +9,7 @@
   },
   "scripts": {
     "start": "node readme-tsdoc.js",
-    "readme-tsdoc": "node src/cli.js",
+    "readme-tsdoc": "node src/cli.js --repo-url https://github.com/vanviegen/readme-tsdoc",
     "prepublishOnly": "npm run readme-tsdoc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },

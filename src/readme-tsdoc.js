@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { createProgram, ScriptTarget, SyntaxKind, SymbolFlags, NodeFlags, ModuleResolutionKind, ModuleKind } from 'typescript';
 
 const COMPILER_OPTIONS = {
@@ -17,9 +18,10 @@ const COMPILER_OPTIONS = {
  * Generate markdown documentation for a TypeScript file using TypeScript compiler API
  * @param {string} filePath Path to the TypeScript file
  * @param {string} headingPrefix The heading prefix to use (e.g., '###' for level 3)
+ * @param {string} [repoUrl] Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
  * @returns {Promise<string>} Generated markdown documentation
  */
-export function generateMarkdownDoc(filePath, headingPrefix) {
+export function generateMarkdownDoc(filePath, headingPrefix, repoUrl) {
     const program = createProgram([filePath], COMPILER_OPTIONS);
     const checker = program.getTypeChecker();
     const sourceFile = program.getSourceFiles().find(sf => 
@@ -32,15 +34,40 @@ export function generateMarkdownDoc(filePath, headingPrefix) {
     
     let output = '';
     for (const [name, symbol] of sourceFile.symbol.exports) {
-        output += generateSymbolDoc(name, symbol, checker, headingPrefix);
+        output += generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, repoUrl);
     }
     return output;
 }
 
 /**
+ * Generate a deep link to the symbol in the repository
+ * @param {string} repoUrl The repository URL
+ * @param {string} filePath The absolute file path
+ * @param {number} lineNumber The line number where the symbol is defined
+ * @returns {string} The deep link URL
+ */
+function generateDeepLink(repoUrl, filePath, lineNumber) {    
+    // Get the relative path within the git repo (also verifies it exists)
+    const relativePath = execSync(`git ls-files --full-name "${filePath}"`, {
+        encoding: 'utf8'
+    }).trim();
+    
+    if (!relativePath) return undefined;
+    
+    const baseUrl = repoUrl.replace(/\/$/, '');
+    
+    // Determine if it's a GitLab URL
+    if (baseUrl.match(/:\/\/(www\.)?gitlab\.com/)) {
+        return `${baseUrl}/-/blob/main/${relativePath}#L${lineNumber}`;
+    } else {
+        return `${baseUrl}/blob/main/${relativePath}#L${lineNumber}`;
+    }
+}
+
+/**
  * Generate documentation for a single symbol
  */
-function generateSymbolDoc(name, symbol, checker, headingPrefix) {
+function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, repoUrl) {
     const { declaration, originalSymbol } = resolveSymbol(symbol, checker);
     
     if (!declaration) {
@@ -48,7 +75,16 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix) {
     }
     
     const typeInfo = getTypeInfo(originalSymbol, declaration, checker);
-    const typeLabel = getTypeLabel(declaration, typeInfo);
+    let typeLabel = getTypeLabel(declaration, typeInfo);
+    
+    // Add an optional deep link to the type label
+    if (repoUrl && declaration.pos !== undefined) {
+        const lineNumber = sourceFile.getLineAndCharacterOfPosition(declaration.getStart()).line + 1;
+        const deepLink = generateDeepLink(repoUrl, sourceFile.fileName, lineNumber);
+        if (deepLink) {
+            typeLabel = `[${typeLabel}](${deepLink})`;
+        }
+    }
     
     let doc = `${headingPrefix} ${name} · ${typeLabel}\n\n`;
     
@@ -57,7 +93,7 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix) {
         doc += `${jsDoc}\n\n`;
     }
     
-    doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name);
+    doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name, sourceFile, repoUrl);
     
     return doc;
 }
@@ -158,7 +194,7 @@ function extractJSDoc(declaration) {
 /**
  * Generate type-specific documentation
  */
-function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix, name) {
+function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl) {
     if (!typeString) {
         return '*Type information unavailable*\n\n';
     }
@@ -171,7 +207,7 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
             return generateFunctionDoc(declaration, typeString, checker);
         }
         if (typeString.startsWith('typeof ')) {
-            return generateClassDoc(declaration, typeString, checker, headingPrefix, name);
+            return generateClassDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl);
         }
     }
     
@@ -179,7 +215,7 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
         case SyntaxKind.FunctionDeclaration:
             return generateFunctionDoc(declaration, typeString, checker);
         case SyntaxKind.ClassDeclaration:
-            return generateClassDoc(declaration, typeString, checker, headingPrefix, name);
+            return generateClassDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl);
         default:
             return `**Value:** \`${typeString}\`\n\n`;
     }
@@ -334,7 +370,7 @@ function generateJSDocTags(jsDoc) {
 /**
  * Generate documentation for class declarations
  */
-function generateClassDoc(declaration, typeString, checker, headingPrefix, className) {
+function generateClassDoc(declaration, typeString, checker, headingPrefix, className, sourceFile, repoUrl) {
     let doc = '';
     
     // Handle variable declarations that reference classes
@@ -382,7 +418,7 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
     );
     
     [...staticMembers, ...instanceMembers].forEach(member => {
-        doc += generateClassMemberDoc(member, checker, staticMembers.includes(member), headingPrefix, className);
+        doc += generateClassMemberDoc(member, checker, staticMembers.includes(member), headingPrefix, className, sourceFile, repoUrl);
     });
     
     return doc;
@@ -391,14 +427,23 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
 /**
  * Generate documentation for a class member
  */
-function generateClassMemberDoc(member, checker, isStatic, headingPrefix, className) {
+function generateClassMemberDoc(member, checker, isStatic, headingPrefix, className, sourceFile, repoUrl) {
     const memberName = member.name?.getText() || 'unknown';
-    const memberType = getMemberType(member, isStatic);
+    let memberType = getMemberType(member, isStatic);
     
     const prefix = isStatic ? className : className.charAt(0).toLowerCase() + className.slice(1);
-    const formattedName = `${prefix}.${memberName}`;
+    const heading = `${prefix}.${memberName}`;
     
-    let doc = `${headingPrefix}# ${formattedName} · ${memberType}\n\n`;
+    // Add an optional deep link to the member type
+    if (repoUrl && member.pos !== undefined && sourceFile) {
+        const lineNumber = sourceFile.getLineAndCharacterOfPosition(member.getStart()).line + 1;
+        const deepLink = generateDeepLink(repoUrl, sourceFile.fileName, lineNumber);
+        if (deepLink) {
+            memberType = `[${memberType}](${deepLink})`;
+        }
+    }
+    
+    let doc = `${headingPrefix}# ${heading} · ${memberType}\n\n`;
     
     const jsDoc = extractJSDoc(member);
     if (jsDoc) {
@@ -475,9 +520,10 @@ function findNextHeadingBoundary(text, startPos, maxLevel) {
  * Update README file with auto-generated TypeScript documentation
  * @param {string} readmePath Path to the README file to update
  * @param {string} searchPhrase The phrase to search for in the README to mark sections for auto-generation
+ * @param {string} [repoUrl] Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
  * @returns {Promise<void>}
  */
-export function updateReadme(readmePath, searchPhrase) {
+export function updateReadme(readmePath, searchPhrase, repoUrl) {
     const readme = fs.readFileSync(readmePath, 'utf8');
     
     const escapedSearchPhrase = searchPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -505,7 +551,7 @@ export function updateReadme(readmePath, searchPhrase) {
         const headingPrefix = '#'.repeat(baseHeadingLevel + 1);
         
         console.log(`Generating docs for ${sourceFile} with heading level ${baseHeadingLevel + 1}...`);
-        const newContent = generateMarkdownDoc(sourceFile, headingPrefix);
+        const newContent = generateMarkdownDoc(sourceFile, headingPrefix, repoUrl);
         
         const replacement = (precedingHeadingLevel ? `${'#'.repeat(precedingHeadingLevel.length)} ` : '') + 
                           beforeSearch + newContent;
