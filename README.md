@@ -66,11 +66,11 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 - `filePath: any` - Path to the TypeScript file
 - `headingPrefix: any` - The heading prefix to use (e.g., '###' for level 3)
-- `repoUrl: any` - Optional repository URL for generating deep links (e.g., 'https://github.com/username/repo')
+- `repoUrl: any` - Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
 
 **Returns:** Generated markdown documentation
 
-### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L526)
+### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L588)
 
 Update README file with auto-generated TypeScript documentation
 
@@ -227,9 +227,13 @@ Set a new precision value
 
 ### SPEED_OF_LIGHT · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/demo.ts#L93)
 
+A constant representing the speed of light in vacuum (m/s)
+
 **Value:** `299792458`
 
 ### CONFIG · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/demo.ts#L98)
+
+Configuration object for mathematical operations
 
 **Value:** `{ readonly defaultPrecision: 2; readonly strictMode: true; readonly maxIterations: 1000; }`
 
