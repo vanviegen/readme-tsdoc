@@ -483,7 +483,7 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
  * Generate documentation for a class member
  */
 function generateClassMemberDoc(member, checker, isStatic, headingPrefix, className, sourceFile, repoUrl) {
-    const memberName = member.name?.getText() || 'unknown';
+    const memberName = member.name?.getText() || (member.kind === SyntaxKind.ConstructSignature ? 'new' : 'unknown');
     let memberType = getMemberType(member, isStatic);
     
     const prefix = isStatic ? className : className.charAt(0).toLowerCase() + className.slice(1);
@@ -545,7 +545,8 @@ function getMemberType(member, isStatic) {
         [SyntaxKind.MethodDeclaration]: 'method',
         [SyntaxKind.PropertyDeclaration]: 'property',
         [SyntaxKind.GetAccessor]: 'getter',
-        [SyntaxKind.SetAccessor]: 'setter'
+        [SyntaxKind.SetAccessor]: 'setter',
+        [SyntaxKind.ConstructSignature]: 'constructor'
     };
     return prefix + (typeMap[member.kind] || 'member');
 }
