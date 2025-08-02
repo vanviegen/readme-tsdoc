@@ -89,12 +89,12 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, rep
     let doc = `${headingPrefix} ${name} · ${typeLabel}\n\n`;
     
     // Try to extract JSDoc from export declaration first, then from resolved declaration
-    const jsDoc = extractJSDoc(exportDeclaration) || extractJSDoc(declaration);
-    if (jsDoc) {
-        doc += `${jsDoc}\n\n`;
+    const jsDocObject = extractJSDoc(exportDeclaration) || extractJSDoc(declaration);
+    if (jsDocObject?.comment) {
+        doc += `${jsDocObject.comment}\n\n`;
     }
     
-    doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name, sourceFile, repoUrl);
+    doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name, sourceFile, repoUrl, jsDocObject);
     
     return doc;
 }
@@ -217,25 +217,25 @@ function isConst(declaration) {
 }
 
 /**
- * Extract JSDoc comment from a declaration
+ * Extract JSDoc object from a declaration
  */
 function extractJSDoc(declaration) {
     // First try the declaration itself
     let jsDoc = declaration?.jsDoc?.[0];
-    if (jsDoc?.comment) {
-        return jsDoc.comment;
+    if (jsDoc) {
+        return jsDoc;
     }
     
     // For variable declarations, try the parent VariableStatement
     if (declaration?.kind === SyntaxKind.VariableDeclaration) {
         // Check parent (VariableDeclarationList)
-        if (declaration.parent?.jsDoc?.[0]?.comment) {
-            return declaration.parent.jsDoc[0].comment;
+        if (declaration.parent?.jsDoc?.[0]) {
+            return declaration.parent.jsDoc[0];
         }
         
         // Check grandparent (VariableStatement)
-        if (declaration.parent?.parent?.jsDoc?.[0]?.comment) {
-            return declaration.parent.parent.jsDoc[0].comment;
+        if (declaration.parent?.parent?.jsDoc?.[0]) {
+            return declaration.parent.parent.jsDoc[0];
         }
     }
     
@@ -245,7 +245,7 @@ function extractJSDoc(declaration) {
 /**
  * Generate type-specific documentation
  */
-function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl) {
+function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl, jsDocObject) {
     if (!typeString) {
         return '*Type information unavailable*\n\n';
     }
@@ -255,7 +255,7 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
     // For variable declarations that are actually functions or classes
     if (kind === SyntaxKind.VariableDeclaration) {
         if (typeString.includes('=>') || typeString.startsWith('(')) {
-            return generateFunctionDoc(declaration, typeString, checker);
+            return generateFunctionDoc(declaration, typeString, checker, jsDocObject);
         }
         if (typeString.startsWith('typeof ')) {
             return generateClassDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl);
@@ -264,7 +264,7 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
     
     switch (kind) {
         case SyntaxKind.FunctionDeclaration:
-            return generateFunctionDoc(declaration, typeString, checker);
+            return generateFunctionDoc(declaration, typeString, checker, jsDocObject);
         case SyntaxKind.ClassDeclaration:
         case SyntaxKind.InterfaceDeclaration:
             return generateClassDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl);
@@ -281,25 +281,25 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
 /**
  * Generate documentation for functions
  */
-function generateFunctionDoc(declaration, typeString, checker) {
+function generateFunctionDoc(declaration, typeString, checker, jsDocObject) {
     let doc = `**Signature:** \`${typeString}\`\n\n`;
     
     // For variable declarations, try to extract parameter info from JSDoc
-    const jsDoc = declaration.jsDoc?.[0];
-    if (declaration.kind === SyntaxKind.VariableDeclaration && jsDoc?.tags) {
-        return doc + generateJSDocBasedFunctionDoc(jsDoc);
+    const resolvedJSDoc = jsDocObject || declaration.jsDoc?.[0];
+    if (declaration.kind === SyntaxKind.VariableDeclaration && resolvedJSDoc?.tags) {
+        return doc + generateJSDocBasedFunctionDoc(resolvedJSDoc);
     }
     
     // For function declarations, use AST
     if (declaration.typeParameters?.length > 0) {
-        doc += generateTypeParameters(declaration.typeParameters, jsDoc);
+        doc += generateTypeParameters(declaration.typeParameters, resolvedJSDoc);
     }
     
     if (declaration.parameters?.length > 0) {
         doc += generateParameters(declaration);
     }
     
-    doc += generateJSDocTags(jsDoc);
+    doc += generateJSDocTags(resolvedJSDoc);
     
     return doc;
 }
@@ -437,18 +437,19 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
     
     // Generate type parameters documentation for classes
     if (declaration.typeParameters?.length > 0) {
-        const jsDoc = declaration.jsDoc?.[0];
+        const jsDoc = extractJSDoc(declaration);
         doc += generateTypeParameters(declaration.typeParameters, jsDoc);
     }
     
     // Generate JSDoc tags (examples, etc.) for the class
-    const jsDoc = declaration.jsDoc?.[0];
+    const jsDoc = extractJSDoc(declaration);
     doc += generateJSDocTags(jsDoc);
     
     // Extract constructor documentation
     const constructor = declaration.members?.find(m => m.kind === SyntaxKind.Constructor);
-    if (constructor?.jsDoc?.[0]?.tags) {
-        const paramTags = constructor.jsDoc[0].tags.filter(tag => 
+    const constructorJSDoc = constructor ? extractJSDoc(constructor) : null;
+    if (constructorJSDoc?.tags) {
+        const paramTags = constructorJSDoc.tags.filter(tag => 
             tag.tagName?.escapedText === 'param'
         );
         if (paramTags.length > 0) {
@@ -502,9 +503,9 @@ function generateClassMemberDoc(member, checker, isStatic, headingPrefix, classN
     
     let doc = `${headingPrefix}# ${heading} · ${memberType}\n\n`;
     
-    const jsDoc = extractJSDoc(member);
-    if (jsDoc) {
-        doc += `${jsDoc}\n\n`;
+    const jsDocObject = extractJSDoc(member);
+    if (jsDocObject?.comment) {
+        doc += `${jsDocObject.comment}\n\n`;
     }
     
     try {
@@ -516,12 +517,11 @@ function generateClassMemberDoc(member, checker, isStatic, headingPrefix, classN
             if (member.kind === SyntaxKind.MethodDeclaration) {
                 doc += `**Signature:** \`${typeString}\`\n\n`;
                 doc += generateParameters(member);
-                doc += generateJSDocTags(member.jsDoc?.[0]);
+                doc += generateJSDocTags(jsDocObject);
             } else {
                 doc += `**Type:** \`${typeString}\`\n\n`;
-                const jsDocObj = member.jsDoc?.[0];
-                if (jsDocObj?.tags) {
-                    const exampleTags = jsDocObj.tags.filter(tag => 
+                if (jsDocObject?.tags) {
+                    const exampleTags = jsDocObject.tags.filter(tag => 
                         tag.tagName?.escapedText === 'example'
                     );
                     if (exampleTags.length > 0) {

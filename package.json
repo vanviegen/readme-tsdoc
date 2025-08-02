@@ -1,6 +1,6 @@
 {
   "name": "readme-tsdoc",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "Automatically generate TypeScript documentation and insert it into your README.md file",
   "main": "src/readme-tsdoc.js",
   "type": "module",
