@@ -146,6 +146,14 @@ function getTypeLabel(declaration, typeString) {
         return 'class';
     }
     
+    if (kind === SyntaxKind.InterfaceDeclaration) {
+        return 'interface';
+    }
+    
+    if (kind === SyntaxKind.TypeAliasDeclaration) {
+        return 'type';
+    }
+    
     if (kind === SyntaxKind.VariableDeclaration) {
         // Check if it's a function or class assigned to a const
         if (typeString) {
@@ -215,7 +223,13 @@ function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix
         case SyntaxKind.FunctionDeclaration:
             return generateFunctionDoc(declaration, typeString, checker);
         case SyntaxKind.ClassDeclaration:
+        case SyntaxKind.InterfaceDeclaration:
             return generateClassDoc(declaration, typeString, checker, headingPrefix, name, sourceFile, repoUrl);
+        case SyntaxKind.TypeAliasDeclaration:
+            // For type aliases, show the actual definition rather than resolved type
+            const typeNode = declaration.type;
+            const actualType = typeNode ? typeNode.getText() : typeString;
+            return `**Type:** \`${actualType}\`\n\n`;
         default:
             return `**Value:** \`${typeString}\`\n\n`;
     }
