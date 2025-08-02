@@ -1,6 +1,6 @@
 {
   "name": "readme-tsdoc",
-  "version": "1.1.2",
+  "version": "1.1.3",
   "description": "Automatically generate TypeScript documentation and insert it into your README.md file",
   "main": "src/readme-tsdoc.js",
   "type": "module",
@@ -8,10 +8,9 @@
     "readme-tsdoc": "./src/cli.js"
   },
   "scripts": {
-    "start": "node readme-tsdoc.js",
     "readme-tsdoc": "node src/cli.js --repo-url https://github.com/vanviegen/readme-tsdoc",
-    "prepublishOnly": "npm run readme-tsdoc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "prepublishOnly": "npm run test && npm run readme-tsdoc",
+    "test": "test/run"
   },
   "keywords": [
     "typescript",
