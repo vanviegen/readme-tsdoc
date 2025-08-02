@@ -1,12 +1,5 @@
-#!/usr/bin/env node
-
-/**
-* Insert TypeScript documentation into README.md file.
-*/
-
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { fileURLToPath } from 'url';
 import { createProgram, ScriptTarget, SyntaxKind, SymbolFlags, NodeFlags, ModuleResolutionKind, ModuleKind } from 'typescript';
 
 /**
@@ -436,28 +429,6 @@ function findNextHeadingBoundary(text, startPos, maxLevel) {
 }
 
 /**
- * Parse command line arguments and return configuration
- * @returns {{readmePath: string, searchPhrase: string}} Parsed configuration object
- */
-function parseCommandLineArgs() {
-    const args = process.argv.slice(2);
-    let readmePath = 'README.md';
-    let searchPhrase = 'The following is auto-generated from';
-    
-    for (let i = 0; i < args.length; i++) {
-        if (args[i] === '--file' && i + 1 < args.length) {
-            readmePath = args[i + 1];
-            i++;
-        } else if (args[i] === '--search' && i + 1 < args.length) {
-            searchPhrase = args[i + 1];
-            i++;
-        }
-    }
-    
-    return { readmePath, searchPhrase };
-}
-
-/**
  * Update README file with auto-generated TypeScript documentation
  * @param {string} readmePath Path to the README file to update
  * @param {string} searchPhrase The phrase to search for in the README to mark sections for auto-generation
@@ -517,13 +488,4 @@ export async function updateReadme(readmePath, searchPhrase) {
     
     await fs.writeFile(readmePath, updatedReadme);
     console.log(`Updated documentation for ${filesProcessed} file(s) in ${readmePath}`);
-}
-
-// CLI entry point
-if (import.meta.url === `file://${process.argv[1]}`) {
-    const { readmePath, searchPhrase } = parseCommandLineArgs();
-    updateReadme(readmePath, searchPhrase).catch(err => {
-        console.error('Error:', err);
-        process.exit(1);
-    });
 }

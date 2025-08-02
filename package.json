@@ -2,10 +2,10 @@
   "name": "readme-tsdoc",
   "version": "1.0.0",
   "description": "Automatically generate TypeScript documentation and insert it into your README.md file",
-  "main": "readme-tsdoc.js",
+  "main": "src/readme-tsdoc.js",
   "type": "module",
   "bin": {
-    "readme-tsdoc": "./readme-tsdoc.js"
+    "readme-tsdoc": "./src/cli.js"
   },
   "scripts": {
     "start": "node readme-tsdoc.js",
@@ -30,7 +30,7 @@
     "typescript": "^5.0.0"
   },
   "files": [
-    "readme-tsdoc.js",
+    "src",
     "README.md"
   ],
   "repository": {
