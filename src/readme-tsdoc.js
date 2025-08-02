@@ -166,7 +166,9 @@ function getTypeLabel(declaration, typeString) {
     }
     
     if (kind === SyntaxKind.ClassDeclaration) {
-        return 'class';
+        // Check if the class is abstract
+        const isAbstract = declaration.modifiers?.some(mod => mod.kind === SyntaxKind.AbstractKeyword);
+        return isAbstract ? 'abstract class' : 'class';
     }
     
     if (kind === SyntaxKind.InterfaceDeclaration) {
@@ -540,7 +542,11 @@ function generateClassMemberDoc(member, checker, isStatic, headingPrefix, classN
  * Determine the type of a class member
  */
 function getMemberType(member, isStatic) {
-    const prefix = isStatic ? 'static ' : '';
+    const isAbstract = member.modifiers?.some(mod => mod.kind === SyntaxKind.AbstractKeyword);
+    const abstractPrefix = isAbstract ? 'abstract ' : '';
+    const staticPrefix = isStatic ? 'static ' : '';
+    const prefix = abstractPrefix + staticPrefix;
+    
     const typeMap = {
         [SyntaxKind.MethodDeclaration]: 'method',
         [SyntaxKind.PropertyDeclaration]: 'property',
