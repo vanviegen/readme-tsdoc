@@ -389,5 +389,8 @@ export const SUPPORTED_FORMATS = ['json', 'xml', 'csv', 'yaml'] as const;
  */
 export type SupportedFormat = typeof SUPPORTED_FORMATS[number];
 
-// Test re-export from npm package
+// Re-export from a local module
+export { Container, type TestInterface } from './helper.js';
+
+// Re-export from npm package
 export { deepCopy } from "fast-deep-copy";

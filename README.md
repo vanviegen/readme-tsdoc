@@ -71,7 +71,7 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 **Returns:** Generated markdown documentation
 
-### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L588)
+### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L593)
 
 Update README file with auto-generated TypeScript documentation
 
@@ -102,7 +102,7 @@ This ensures your documentation is always up-to-date before publishing.
 
 The following is auto-generated from `test/demo.ts`:
 
-### celsiusToFahrenheit · function
+### celsiusToFahrenheit · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L86)
 
 Convert temperature between Celsius and Fahrenheit
 
@@ -121,7 +121,7 @@ const fahrenheit = celsiusToFahrenheit(25);
 console.log(fahrenheit); // 77
 ```
 
-### findMax · function
+### findMax · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L120)
 
 Generic function to find the maximum value in an array
 
@@ -146,7 +146,7 @@ const max = findMax(numbers, (a, b) => a - b);
 console.log(max); // 9
 ```
 
-### MathUtils · class
+### MathUtils · [class](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L4)
 
 A utility class for mathematical operations and calculations
 
@@ -154,7 +154,7 @@ A utility class for mathematical operations and calculations
 
 - `precision`: Number of decimal places for rounding (default: 2)
 
-#### MathUtils.PI · static property
+#### MathUtils.PI · [static property](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L12)
 
 The mathematical constant PI
 
@@ -166,7 +166,7 @@ The mathematical constant PI
 console.log(MathUtils.PI); // 3.141592653589793
 ```
 
-#### MathUtils.circleArea · static method
+#### MathUtils.circleArea · [static method](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L25)
 
 Calculate the area of a circle
 
@@ -189,13 +189,13 @@ const area = MathUtils.circleArea(5);
 console.log(area); // 78.53981633974483
 ```
 
-#### mathUtils.precision · property
+#### mathUtils.precision · [property](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L35)
 
 Current calculation precision for rounding operations
 
 **Type:** `number`
 
-#### mathUtils.round · method
+#### mathUtils.round · [method](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L56)
 
 Round a number to the specified precision
 
@@ -215,25 +215,25 @@ const rounded = math.round(3.14159);
 console.log(rounded); // 3.142
 ```
 
-#### mathUtils.currentPrecision · getter
+#### mathUtils.currentPrecision · [getter](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L64)
 
 Get the current precision setting
 
 **Type:** `number`
 
-#### mathUtils.currentPrecision · setter
+#### mathUtils.currentPrecision · [setter](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L71)
 
 Set a new precision value
 
 **Type:** `number`
 
-### SPEED_OF_LIGHT · constant
+### SPEED_OF_LIGHT · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L93)
 
 A constant representing the speed of light in vacuum (m/s)
 
 **Value:** `299792458`
 
-### CONFIG · constant
+### CONFIG · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L98)
 
 Configuration object for mathematical operations
 

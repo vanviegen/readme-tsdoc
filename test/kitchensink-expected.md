@@ -402,6 +402,54 @@ A complex type derived from the constant
 
 **Type:** `typeof SUPPORTED_FORMATS[number]`
 
+### Container · [interface](https://github.com/me/example/blob/main/test/kitchensink.ts#L14)
+
+A generic interface for container types
+
+**Type Parameters:**
+
+- `T` - The type of items stored in the container
+
+#### container.items · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L17)
+
+The items in the container
+
+**Type:** `T[]`
+
+#### container.add · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L17)
+
+Add an item to the container
+
+**Type:** `(item: T) => void`
+
+#### container.get · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L20)
+
+Get an item by index
+
+**Type:** `(index: number) => T`
+
+### TestInterface · [interface](https://github.com/me/example/blob/main/test/kitchensink.ts#L4)
+
+Helper utilities for testing various TypeScript constructs
+
+#### testInterface.name · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L5)
+
+A required string property
+
+**Type:** `string`
+
+#### testInterface.count · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L9)
+
+An optional number property
+
+**Type:** `number`
+
+#### testInterface.process · [member](https://github.com/me/example/blob/main/test/kitchensink.ts#L10)
+
+A method that returns a promise
+
+**Type:** `() => Promise<void>`
+
 ### deepCopy · [function](https://github.com/me/example/blob/main/test/kitchensink.ts#L9)
 
 Deep copy the given object considering circular structure.

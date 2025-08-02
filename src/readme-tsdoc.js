@@ -89,6 +89,7 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, rep
     let doc = `${headingPrefix} ${name} · ${typeLabel}\n\n`;
     
     // Try to extract JSDoc from export declaration first, then from resolved declaration
+    // This allows re-export JSDoc to override the original documentation
     const jsDocObject = extractJSDoc(exportDeclaration) || extractJSDoc(declaration);
     if (jsDocObject?.comment) {
         doc += `${jsDocObject.comment}\n\n`;
@@ -111,9 +112,13 @@ function resolveSymbol(symbol, checker) {
     if (declaration?.kind === SyntaxKind.ExportSpecifier && symbol.flags & SymbolFlags.Alias) {
         try {
             const aliasedSymbol = checker.getAliasedSymbol(symbol);
-            if (aliasedSymbol?.valueDeclaration) {
+            if (aliasedSymbol) {
                 originalSymbol = aliasedSymbol;
-                declaration = aliasedSymbol.valueDeclaration || aliasedSymbol.declarations?.[0];
+                // For aliased symbols, prefer the original declaration
+                const aliasedDeclaration = aliasedSymbol.valueDeclaration || aliasedSymbol.declarations?.[0];
+                if (aliasedDeclaration) {
+                    declaration = aliasedDeclaration;
+                }
             }
         } catch (error) {
             // Fall back to original symbol
