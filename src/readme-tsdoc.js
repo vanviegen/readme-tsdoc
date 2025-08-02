@@ -68,7 +68,7 @@ function generateDeepLink(repoUrl, filePath, lineNumber) {
  * Generate documentation for a single symbol
  */
 function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, repoUrl) {
-    const { declaration, originalSymbol } = resolveSymbol(symbol, checker);
+    const { declaration, originalSymbol, exportDeclaration } = resolveSymbol(symbol, checker);
     
     if (!declaration) {
         return `${headingPrefix} ${name}\n\n*No declaration found*\n\n`;
@@ -88,7 +88,8 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, rep
     
     let doc = `${headingPrefix} ${name} · ${typeLabel}\n\n`;
     
-    const jsDoc = extractJSDoc(declaration);
+    // Try to extract JSDoc from export declaration first, then from resolved declaration
+    const jsDoc = extractJSDoc(exportDeclaration) || extractJSDoc(declaration);
     if (jsDoc) {
         doc += `${jsDoc}\n\n`;
     }
@@ -104,7 +105,9 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, rep
 function resolveSymbol(symbol, checker) {
     let declaration = symbol.valueDeclaration || symbol.declarations?.[0];
     let originalSymbol = symbol;
+    let exportDeclaration = declaration; // Keep track of the original export declaration
     
+    // Handle export specifiers (export { foo } from './module')
     if (declaration?.kind === SyntaxKind.ExportSpecifier && symbol.flags & SymbolFlags.Alias) {
         try {
             const aliasedSymbol = checker.getAliasedSymbol(symbol);
@@ -116,8 +119,28 @@ function resolveSymbol(symbol, checker) {
             // Fall back to original symbol
         }
     }
+    // Handle variable declarations that are type assertions (export const foo = bar as Type)
+    else if (declaration?.kind === SyntaxKind.VariableDeclaration && declaration.initializer?.kind === SyntaxKind.AsExpression) {
+        // For type assertions, try to resolve the original symbol
+        try {
+            const expr = declaration.initializer.expression;
+            if (expr) {
+                const innerSymbol = checker.getSymbolAtLocation(expr);
+                if (innerSymbol?.valueDeclaration) {
+                    originalSymbol = innerSymbol;
+                    // Keep the export declaration for JSDoc, but use inner declaration for type info
+                    const innerDeclaration = innerSymbol.valueDeclaration || innerSymbol.declarations?.[0];
+                    if (innerDeclaration) {
+                        declaration = innerDeclaration;
+                    }
+                }
+            }
+        } catch (error) {
+            // Fall back to original symbol
+        }
+    }
     
-    return { declaration, originalSymbol };
+    return { declaration, originalSymbol, exportDeclaration };
 }
 
 /**
@@ -195,8 +218,26 @@ function isConst(declaration) {
  * Extract JSDoc comment from a declaration
  */
 function extractJSDoc(declaration) {
-    const jsDoc = declaration?.jsDoc?.[0];
-    return jsDoc?.comment || null;
+    // First try the declaration itself
+    let jsDoc = declaration?.jsDoc?.[0];
+    if (jsDoc?.comment) {
+        return jsDoc.comment;
+    }
+    
+    // For variable declarations, try the parent VariableStatement
+    if (declaration?.kind === SyntaxKind.VariableDeclaration) {
+        // Check parent (VariableDeclarationList)
+        if (declaration.parent?.jsDoc?.[0]?.comment) {
+            return declaration.parent.jsDoc[0].comment;
+        }
+        
+        // Check grandparent (VariableStatement)
+        if (declaration.parent?.parent?.jsDoc?.[0]?.comment) {
+            return declaration.parent.parent.jsDoc[0].comment;
+        }
+    }
+    
+    return null;
 }
 
 /**
