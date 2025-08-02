@@ -124,7 +124,7 @@ Generic function to find the maximum value in an array
 
 **Type Parameters:**
 
-- `T`
+- `T` - The type of elements in the array
 
 **Parameters:**
 
@@ -230,14 +230,9 @@ Set a new precision value
 
 **Value:** `{ readonly defaultPrecision: 2; readonly strictMode: true; readonly maxIterations: 1000; }`
 
-## License
+## About this project
 
-ISC License - see LICENSE file for details.
+- Created by Claude Sonnet & Frank van Viegen.
+- ISC License - see LICENSE file for details.
+- Contributions are welcome! Please feel free to submit a Pull Request.
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## Authors
-
-Claude Sonnet & Frank van Viegen

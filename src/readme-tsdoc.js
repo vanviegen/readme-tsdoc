@@ -1,6 +1,17 @@
-import * as fs from 'fs/promises';
+import * as fs from 'fs';
 import * as path from 'path';
 import { createProgram, ScriptTarget, SyntaxKind, SymbolFlags, NodeFlags, ModuleResolutionKind, ModuleKind } from 'typescript';
+
+const COMPILER_OPTIONS = {
+    target: ScriptTarget.ES2022,
+    module: ModuleKind.CommonJS,
+    moduleResolution: ModuleResolutionKind.Node16,
+    allowJs: true,
+    declaration: true,
+    esModuleInterop: true,
+    skipLibCheck: false,
+    forceConsistentCasingInFileNames: true
+};
 
 /**
  * Generate markdown documentation for a TypeScript file using TypeScript compiler API
@@ -8,31 +19,21 @@ import { createProgram, ScriptTarget, SyntaxKind, SymbolFlags, NodeFlags, Module
  * @param {string} headingPrefix The heading prefix to use (e.g., '###' for level 3)
  * @returns {Promise<string>} Generated markdown documentation
  */
-export async function generateMarkdownDoc(filePath, headingPrefix) {
-    const program = createProgram([filePath], {
-        target: ScriptTarget.ES2022,
-        module: ModuleKind.CommonJS,
-        moduleResolution: ModuleResolutionKind.Node16,
-        allowJs: true,
-        declaration: true,
-        esModuleInterop: true,
-        skipLibCheck: false,
-        forceConsistentCasingInFileNames: true
-    });
-    
+export function generateMarkdownDoc(filePath, headingPrefix) {
+    const program = createProgram([filePath], COMPILER_OPTIONS);
     const checker = program.getTypeChecker();
-    const sourceFile = program.getSourceFiles().filter(sf => path.resolve(sf.fileName) == path.resolve(filePath))[0];
-
-    if (!sourceFile || !sourceFile.symbol || !sourceFile.symbol.exports) {
-        throw new Error(`No exports found in ${filePath}`);``
+    const sourceFile = program.getSourceFiles().find(sf => 
+        path.resolve(sf.fileName) === path.resolve(filePath)
+    );
+    
+    if (!sourceFile?.symbol?.exports) {
+        throw new Error(`No exports found in ${filePath}`);
     }
-
-    // Process each exported symbol
+    
     let output = '';
-    for(const [name, symbol] of sourceFile.symbol.exports) {
+    for (const [name, symbol] of sourceFile.symbol.exports) {
         output += generateSymbolDoc(name, symbol, checker, headingPrefix);
     }
-
     return output;
 }
 
@@ -40,167 +41,291 @@ export async function generateMarkdownDoc(filePath, headingPrefix) {
  * Generate documentation for a single symbol
  */
 function generateSymbolDoc(name, symbol, checker, headingPrefix) {
-    // Get the first declaration (main one)
-    const declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+    const { declaration, originalSymbol } = resolveSymbol(symbol, checker);
+    
     if (!declaration) {
         return `${headingPrefix} ${name}\n\n*No declaration found*\n\n`;
     }
-
-    // For re-exports, try to get the original symbol
-    let originalSymbol = symbol;
-    let originalDeclaration = declaration;
     
-    if (declaration.kind === SyntaxKind.ExportSpecifier && symbol.flags & SymbolFlags.Alias) {
-        try {
-            const aliasedSymbol = checker.getAliasedSymbol(symbol);
-            if (aliasedSymbol && aliasedSymbol.valueDeclaration) {
-                originalSymbol = aliasedSymbol;
-                originalDeclaration = aliasedSymbol.valueDeclaration || aliasedSymbol.declarations?.[0];
-            }
-        } catch (error) {
-            // Fall back to original symbol if aliasing fails
-        }
-    }
-
-    // Determine the type for the title
-    let typeLabel = 'unknown';
-    if (originalDeclaration.kind === SyntaxKind.FunctionDeclaration) {
-        typeLabel = 'function';
-    } else if (originalDeclaration.kind === SyntaxKind.ClassDeclaration) {
-        typeLabel = 'class';
-    } else if (originalDeclaration.kind === SyntaxKind.VariableDeclaration) {
-        // Check if it's a constant by looking at the parent VariableDeclarationList flags
-        let isConst = false;
-        // Try different levels of the AST to find the const declaration
-        if (originalDeclaration.parent?.flags & NodeFlags.Const) {
-            isConst = true;
-        } else if (originalDeclaration.parent?.parent?.flags & NodeFlags.Const) {
-            isConst = true;
-        } else {
-            // Check the keyword on the variable statement
-            const varStatement = originalDeclaration.parent?.parent;
-            if (varStatement && varStatement.kind === SyntaxKind.VariableStatement) {
-                const declarationList = varStatement.declarationList;
-                if (declarationList && declarationList.flags & NodeFlags.Const) {
-                    isConst = true;
-                }
-            }
-        }
-        typeLabel = isConst ? 'constant' : 'variable';
-    } else {
-        // Try to get type information for better labeling
-        try {
-            const type = checker.getTypeOfSymbolAtLocation(originalSymbol, originalDeclaration);
-            const typeString = checker.typeToString(type);
-            if (typeString.includes('=>')) {
-                typeLabel = 'function';
-            } else {
-                typeLabel = 'value';
-            }
-        } catch (error) {
-            typeLabel = 'value';
-        }
-    }
-
+    const typeInfo = getTypeInfo(originalSymbol, declaration, checker);
+    const typeLabel = getTypeLabel(declaration, typeInfo);
+    
     let doc = `${headingPrefix} ${name} · ${typeLabel}\n\n`;
-
-    // Extract JSDoc comment - try original declaration first, then the export
-    let jsDoc = originalDeclaration?.jsDoc?.[0] || declaration.jsDoc?.[0];
-    if (jsDoc && jsDoc.comment) {
-        doc += `${jsDoc.comment}\n\n`;
+    
+    const jsDoc = extractJSDoc(declaration);
+    if (jsDoc) {
+        doc += `${jsDoc}\n\n`;
     }
-
-    // Get type information
-    try {
-        const type = checker.getTypeOfSymbolAtLocation(originalSymbol, originalDeclaration);
-        const typeString = checker.typeToString(type);
-        
-        // Handle different kinds of exports
-        if (originalDeclaration.kind === SyntaxKind.FunctionDeclaration) {
-            doc += generateFunctionDoc(originalDeclaration, typeString, checker, headingPrefix);
-        } else if (originalDeclaration.kind === SyntaxKind.ClassDeclaration) {
-            doc += generateClassDoc(originalDeclaration, typeString, checker, headingPrefix, name);
-        } else if (originalDeclaration.kind === SyntaxKind.VariableDeclaration) {
-            doc += generateVariableDoc(originalDeclaration, typeString, checker, headingPrefix);
-        } else {
-            doc += `**Type:** \`${typeString}\`\n\n`;
-        }
-    } catch (error) {
-        console.warn(`Warning: Could not get type information for ${name}:`, error.message);
-        doc += `*Type information unavailable*\n\n`;
-    }
-
+    
+    doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name);
+    
     return doc;
 }
 
 /**
- * Generate documentation for function declarations
+ * Resolve symbol to its original declaration, handling re-exports
  */
-function generateFunctionDoc(declaration, typeString, checker, headingPrefix) {
+function resolveSymbol(symbol, checker) {
+    let declaration = symbol.valueDeclaration || symbol.declarations?.[0];
+    let originalSymbol = symbol;
+    
+    if (declaration?.kind === SyntaxKind.ExportSpecifier && symbol.flags & SymbolFlags.Alias) {
+        try {
+            const aliasedSymbol = checker.getAliasedSymbol(symbol);
+            if (aliasedSymbol?.valueDeclaration) {
+                originalSymbol = aliasedSymbol;
+                declaration = aliasedSymbol.valueDeclaration || aliasedSymbol.declarations?.[0];
+            }
+        } catch (error) {
+            // Fall back to original symbol
+        }
+    }
+    
+    return { declaration, originalSymbol };
+}
+
+/**
+ * Get type information for a symbol
+ */
+function getTypeInfo(symbol, declaration, checker) {
+    try {
+        const type = checker.getTypeOfSymbolAtLocation(symbol, declaration);
+        return checker.typeToString(type);
+    } catch (error) {
+        return null;
+    }
+}
+
+/**
+ * Determine the type label for documentation
+ */
+function getTypeLabel(declaration, typeString) {
+    const kind = declaration.kind;
+    
+    if (kind === SyntaxKind.FunctionDeclaration) {
+        return 'function';
+    }
+    
+    if (kind === SyntaxKind.ClassDeclaration) {
+        return 'class';
+    }
+    
+    if (kind === SyntaxKind.VariableDeclaration) {
+        // Check if it's a function or class assigned to a const
+        if (typeString) {
+            if (typeString.includes('=>') || typeString.startsWith('(')) {
+                return 'function';
+            }
+            if (typeString.startsWith('typeof ') && !typeString.includes('=>')) {
+                return 'class';
+            }
+        }
+        
+        return isConst(declaration) ? 'constant' : 'variable';
+    }
+    
+    // Fallback type detection based on type string
+    if (typeString?.includes('=>')) {
+        return 'function';
+    }
+    
+    return 'value';
+}
+
+/**
+ * Check if a variable declaration is const
+ */
+function isConst(declaration) {
+    let node = declaration;
+    while (node) {
+        if (node.flags & NodeFlags.Const) return true;
+        if (node.kind === SyntaxKind.VariableStatement) {
+            return node.declarationList?.flags & NodeFlags.Const;
+        }
+        node = node.parent;
+    }
+    return false;
+}
+
+/**
+ * Extract JSDoc comment from a declaration
+ */
+function extractJSDoc(declaration) {
+    const jsDoc = declaration?.jsDoc?.[0];
+    return jsDoc?.comment || null;
+}
+
+/**
+ * Generate type-specific documentation
+ */
+function generateTypeSpecificDoc(declaration, typeString, checker, headingPrefix, name) {
+    if (!typeString) {
+        return '*Type information unavailable*\n\n';
+    }
+    
+    const kind = declaration.kind;
+    
+    // For variable declarations that are actually functions or classes
+    if (kind === SyntaxKind.VariableDeclaration) {
+        if (typeString.includes('=>') || typeString.startsWith('(')) {
+            return generateFunctionDoc(declaration, typeString, checker);
+        }
+        if (typeString.startsWith('typeof ')) {
+            return generateClassDoc(declaration, typeString, checker, headingPrefix, name);
+        }
+    }
+    
+    switch (kind) {
+        case SyntaxKind.FunctionDeclaration:
+            return generateFunctionDoc(declaration, typeString, checker);
+        case SyntaxKind.ClassDeclaration:
+            return generateClassDoc(declaration, typeString, checker, headingPrefix, name);
+        default:
+            return `**Value:** \`${typeString}\`\n\n`;
+    }
+}
+
+/**
+ * Generate documentation for functions
+ */
+function generateFunctionDoc(declaration, typeString, checker) {
     let doc = `**Signature:** \`${typeString}\`\n\n`;
     
-    // Extract type parameters
-    if (declaration.typeParameters && declaration.typeParameters.length > 0) {
-        doc += `**Type Parameters:**\n\n`;
-        for (const typeParam of declaration.typeParameters) {
-            const paramName = typeParam.name.getText();
-            const constraint = typeParam.constraint ? ` extends ${typeParam.constraint.getText()}` : '';
-            const defaultType = typeParam.default ? ` = ${typeParam.default.getText()}` : '';
-            doc += `- \`${paramName}${constraint}${defaultType}\`\n`;
-        }
-        doc += `\n`;
-    }
-    
-    // Extract runtime parameters with their TypeScript types
-    if (declaration.parameters && declaration.parameters.length > 0) {
-        doc += `**Parameters:**\n\n`;
-        for (const param of declaration.parameters) {
-            const paramName = param.name.getText();
-            const paramType = param.type ? param.type.getText() : 'any';
-            const isOptional = param.questionToken ? '?' : '';
-            const hasDefault = param.initializer ? ' (optional)' : '';
-            
-            // Try to get JSDoc comment for this parameter
-            const jsDoc = declaration.jsDoc?.[0];
-            let paramComment = '';
-            if (jsDoc && jsDoc.tags) {
-                const paramTag = jsDoc.tags.find(tag => 
-                    tag.tagName?.escapedText === 'param' && 
-                    (tag.name?.escapedText === paramName || tag.name?.getText?.() === paramName)
-                );
-                paramComment = paramTag ? ` - ${paramTag.comment || ''}` : '';
-            }
-            
-            doc += `- \`${paramName}${isOptional}: ${paramType}\`${hasDefault}${paramComment}\n`;
-        }
-        doc += `\n`;
-    }
-    
-    // Extract other JSDoc information
+    // For variable declarations, try to extract parameter info from JSDoc
     const jsDoc = declaration.jsDoc?.[0];
-    if (jsDoc && jsDoc.tags) {
-        const returnTag = jsDoc.tags.find(tag => tag.tagName?.escapedText === 'returns');
-        const throwsTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'throws');
-        const exampleTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'example');
-        
-        if (returnTag && returnTag.comment) {
-            doc += `**Returns:** ${returnTag.comment}\n\n`;
+    if (declaration.kind === SyntaxKind.VariableDeclaration && jsDoc?.tags) {
+        return doc + generateJSDocBasedFunctionDoc(jsDoc);
+    }
+    
+    // For function declarations, use AST
+    if (declaration.typeParameters?.length > 0) {
+        doc += generateTypeParameters(declaration.typeParameters, jsDoc);
+    }
+    
+    if (declaration.parameters?.length > 0) {
+        doc += generateParameters(declaration);
+    }
+    
+    doc += generateJSDocTags(jsDoc);
+    
+    return doc;
+}
+
+/**
+ * Generate function documentation based on JSDoc tags
+ */
+function generateJSDocBasedFunctionDoc(jsDoc) {
+    let doc = '';
+    
+    const paramTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'param');
+    if (paramTags.length > 0) {
+        doc += '**Parameters:**\n\n';
+        for (const tag of paramTags) {
+            const name = tag.name?.escapedText || tag.name?.getText?.() || 'unknown';
+            const comment = tag.comment || '';
+            doc += `- \`${name}\` - ${comment}\n`;
         }
+        doc += '\n';
+    }
+    
+    return doc + generateJSDocTags(jsDoc);
+}
+
+/**
+ * Generate type parameters documentation
+ */
+function generateTypeParameters(typeParameters, jsDoc = null) {
+    let doc = '**Type Parameters:**\n\n';
+    
+    // Collect template documentation from JSDoc
+    const templateDocs = new Map();
+    if (jsDoc?.tags) {
+        const templateTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'template');
         
-        if (throwsTags.length > 0) {
-            doc += `**Throws:**\n\n`;
-            for (const throwsTag of throwsTags) {
-                doc += `- ${throwsTag.comment}\n`;
+        // For each type parameter, try to find its corresponding @template tag
+        let templateIndex = 0;
+        for (const param of typeParameters) {
+            const paramName = param.name.getText();
+            
+            // Match by position since @template tags don't have explicit parameter names
+            if (templateIndex < templateTags.length) {
+                const templateTag = templateTags[templateIndex];
+                const comment = templateTag.comment || '';
+                // Remove leading "- " if present
+                const cleanComment = comment.startsWith('- ') ? comment.substring(2) : comment;
+                templateDocs.set(paramName, cleanComment);
+                templateIndex++;
             }
-            doc += `\n`;
+        }
+    }
+    
+    for (const param of typeParameters) {
+        const name = param.name.getText();
+        const constraint = param.constraint ? ` extends ${param.constraint.getText()}` : '';
+        const defaultType = param.default ? ` = ${param.default.getText()}` : '';
+        
+        // Get documentation for this parameter
+        const comment = templateDocs.get(name);
+        const commentText = comment ? ` - ${comment}` : '';
+        
+        doc += `- \`${name}${constraint}${defaultType}\`${commentText}\n`;
+    }
+    return doc + '\n';
+}
+
+/**
+ * Generate parameters documentation
+ */
+function generateParameters(declaration) {
+    let doc = '**Parameters:**\n\n';
+    const jsDoc = declaration.jsDoc?.[0];
+    
+    for (const param of declaration.parameters) {
+        const name = param.name.getText();
+        const type = param.type ? param.type.getText() : 'any';
+        const isOptional = param.questionToken ? '?' : '';
+        const hasDefault = param.initializer ? ' (optional)' : '';
+        
+        // Find JSDoc comment for this parameter
+        let comment = '';
+        if (jsDoc?.tags) {
+            const paramTag = jsDoc.tags.find(tag => 
+                tag.tagName?.escapedText === 'param' && 
+                (tag.name?.escapedText === name || tag.name?.getText?.() === name)
+            );
+            comment = paramTag?.comment ? ` - ${paramTag.comment}` : '';
         }
         
-        if (exampleTags.length > 0) {
-            doc += `**Examples:**\n\n`;
-            for (const example of exampleTags) {
-                doc += `${example.comment}\n\n`;
-            }
-        }
+        doc += `- \`${name}${isOptional}: ${type}\`${hasDefault}${comment}\n`;
+    }
+    
+    return doc + '\n';
+}
+
+/**
+ * Generate documentation from JSDoc tags
+ */
+function generateJSDocTags(jsDoc) {
+    if (!jsDoc?.tags) return '';
+    
+    let doc = '';
+    
+    const returnTag = jsDoc.tags.find(tag => tag.tagName?.escapedText === 'returns');
+    if (returnTag?.comment) {
+        doc += `**Returns:** ${returnTag.comment}\n\n`;
+    }
+    
+    const throwsTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'throws');
+    if (throwsTags.length > 0) {
+        doc += '**Throws:**\n\n';
+        throwsTags.forEach(tag => doc += `- ${tag.comment}\n`);
+        doc += '\n';
+    }
+    
+    const exampleTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'example');
+    if (exampleTags.length > 0) {
+        doc += '**Examples:**\n\n';
+        exampleTags.forEach(tag => doc += `${tag.comment}\n\n`);
     }
     
     return doc;
@@ -212,198 +337,117 @@ function generateFunctionDoc(declaration, typeString, checker, headingPrefix) {
 function generateClassDoc(declaration, typeString, checker, headingPrefix, className) {
     let doc = '';
     
-    // Extract constructor parameters if available
-    const constructor = declaration.members?.find(member => member.kind === SyntaxKind.Constructor);
-    if (constructor) {
-        const jsDoc = constructor.jsDoc?.[0];
-        if (jsDoc && jsDoc.tags) {
-            const paramTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'param');
-            if (paramTags.length > 0) {
-                doc += `**Constructor Parameters:**\n\n`;
-                for (const param of paramTags) {
-                    const paramName = param.name?.escapedText || param.name?.getText?.() || 'unknown';
-                    const paramComment = param.comment || '';
-                    doc += `- \`${paramName}\`: ${paramComment}\n`;
-                }
-                doc += `\n`;
-            }
+    // Handle variable declarations that reference classes
+    if (declaration.kind === SyntaxKind.VariableDeclaration) {
+        return `**Type:** \`${typeString}\`\n\n`;
+    }
+    
+    // Generate type parameters documentation for classes
+    if (declaration.typeParameters?.length > 0) {
+        const jsDoc = declaration.jsDoc?.[0];
+        doc += generateTypeParameters(declaration.typeParameters, jsDoc);
+    }
+    
+    // Generate JSDoc tags (examples, etc.) for the class
+    const jsDoc = declaration.jsDoc?.[0];
+    doc += generateJSDocTags(jsDoc);
+    
+    // Extract constructor documentation
+    const constructor = declaration.members?.find(m => m.kind === SyntaxKind.Constructor);
+    if (constructor?.jsDoc?.[0]?.tags) {
+        const paramTags = constructor.jsDoc[0].tags.filter(tag => 
+            tag.tagName?.escapedText === 'param'
+        );
+        if (paramTags.length > 0) {
+            doc += '**Constructor Parameters:**\n\n';
+            paramTags.forEach(tag => {
+                const name = tag.name?.escapedText || tag.name?.getText?.() || 'unknown';
+                doc += `- \`${name}\`: ${tag.comment || ''}\n`;
+            });
+            doc += '\n';
         }
     }
     
-    // Document static members
-    const staticMembers = declaration.members?.filter(member => 
-        member.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword) &&
-        !member.name?.getText().startsWith('_')
-    ) || [];
+    // Document class members
+    const members = declaration.members || [];
+    const publicMembers = members.filter(m => 
+        !m.name?.getText().startsWith('_') && m.kind !== SyntaxKind.Constructor
+    );
     
-    for (const member of staticMembers) {
-        doc += generateClassMemberDoc(member, checker, true, headingPrefix, className);
-    }
+    const staticMembers = publicMembers.filter(m => 
+        m.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword)
+    );
+    const instanceMembers = publicMembers.filter(m => 
+        !m.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword)
+    );
     
-    // Document instance members (properties and methods)
-    const instanceMembers = declaration.members?.filter(member => 
-        !member.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword) &&
-        member.kind !== SyntaxKind.Constructor &&
-        !member.name?.getText().startsWith('_')
-    ) || [];
-    
-    for (const member of instanceMembers) {
-        doc += generateClassMemberDoc(member, checker, false, headingPrefix, className);
-    }
+    [...staticMembers, ...instanceMembers].forEach(member => {
+        doc += generateClassMemberDoc(member, checker, staticMembers.includes(member), headingPrefix, className);
+    });
     
     return doc;
 }
 
 /**
- * Generate documentation for a class member (method or property)
+ * Generate documentation for a class member
  */
 function generateClassMemberDoc(member, checker, isStatic, headingPrefix, className) {
     const memberName = member.name?.getText() || 'unknown';
+    const memberType = getMemberType(member, isStatic);
     
-    // Determine the member type for the title
-    let memberType = 'member';
-    if (member.kind === SyntaxKind.MethodDeclaration) {
-        memberType = isStatic ? 'static method' : 'method';
-    } else if (member.kind === SyntaxKind.PropertyDeclaration) {
-        memberType = isStatic ? 'static property' : 'property';
-    } else if (member.kind === SyntaxKind.GetAccessor) {
-        memberType = isStatic ? 'static getter' : 'getter';
-    } else if (member.kind === SyntaxKind.SetAccessor) {
-        memberType = isStatic ? 'static setter' : 'setter';
-    }
+    const prefix = isStatic ? className : className.charAt(0).toLowerCase() + className.slice(1);
+    const formattedName = `${prefix}.${memberName}`;
     
-    // Format the member name with class prefix
-    let formattedMemberName;
-    if (isStatic) {
-        formattedMemberName = `${className}.${memberName}`;
-    } else {
-        // Lowercase the first letter of class name for instance members
-        const instancePrefix = className.charAt(0).toLowerCase() + className.slice(1);
-        formattedMemberName = `${instancePrefix}.${memberName}`;
-    }
+    let doc = `${headingPrefix}# ${formattedName} · ${memberType}\n\n`;
     
-    let doc = `${headingPrefix}# ${formattedMemberName} · ${memberType}\n\n`;
-    
-    // Extract JSDoc comment
-    const jsDoc = member.jsDoc?.[0];
-    if (jsDoc && jsDoc.comment) {
-        doc += `${jsDoc.comment}\n\n`;
+    const jsDoc = extractJSDoc(member);
+    if (jsDoc) {
+        doc += `${jsDoc}\n\n`;
     }
     
     try {
-        // Get type information
         const symbol = checker.getSymbolAtLocation(member.name);
         if (symbol) {
             const type = checker.getTypeOfSymbolAtLocation(symbol, member);
             const typeString = checker.typeToString(type);
             
             if (member.kind === SyntaxKind.MethodDeclaration) {
-                // Handle methods like functions
                 doc += `**Signature:** \`${typeString}\`\n\n`;
-                doc += generateMethodJSDocInfo(member);
-            } else if (member.kind === SyntaxKind.PropertyDeclaration) {
-                // Handle properties
-                doc += `**Type:** \`${typeString}\`\n\n`;
-                if (jsDoc && jsDoc.tags) {
-                    const exampleTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'example');
-                    if (exampleTags.length > 0) {
-                        doc += `**Examples:**\n\n`;
-                        for (const example of exampleTags) {
-                            doc += `${example.comment}\n\n`;
-                        }
-                    }
-                }
+                doc += generateParameters(member);
+                doc += generateJSDocTags(member.jsDoc?.[0]);
             } else {
                 doc += `**Type:** \`${typeString}\`\n\n`;
+                const jsDocObj = member.jsDoc?.[0];
+                if (jsDocObj?.tags) {
+                    const exampleTags = jsDocObj.tags.filter(tag => 
+                        tag.tagName?.escapedText === 'example'
+                    );
+                    if (exampleTags.length > 0) {
+                        doc += '**Examples:**\n\n';
+                        exampleTags.forEach(tag => doc += `${tag.comment}\n\n`);
+                    }
+                }
             }
-        } else {
-            doc += `*Type information unavailable*\n\n`;
         }
     } catch (error) {
-        console.warn(`Warning: Could not get type information for ${memberName}:`, error.message);
-        doc += `*Type information unavailable*\n\n`;
+        doc += '*Type information unavailable*\n\n';
     }
     
     return doc;
 }
 
 /**
- * Generate JSDoc information for methods (similar to functions)
+ * Determine the type of a class member
  */
-function generateMethodJSDocInfo(methodDeclaration) {
-    let doc = '';
-    
-    // Extract type parameters
-    if (methodDeclaration.typeParameters && methodDeclaration.typeParameters.length > 0) {
-        doc += `**Type Parameters:**\n\n`;
-        for (const typeParam of methodDeclaration.typeParameters) {
-            const paramName = typeParam.name.getText();
-            const constraint = typeParam.constraint ? ` extends ${typeParam.constraint.getText()}` : '';
-            const defaultType = typeParam.default ? ` = ${typeParam.default.getText()}` : '';
-            doc += `- \`${paramName}${constraint}${defaultType}\`\n`;
-        }
-        doc += `\n`;
-    }
-    
-    // Extract runtime parameters with their TypeScript types
-    if (methodDeclaration.parameters && methodDeclaration.parameters.length > 0) {
-        doc += `**Parameters:**\n\n`;
-        for (const param of methodDeclaration.parameters) {
-            const paramName = param.name.getText();
-            const paramType = param.type ? param.type.getText() : 'any';
-            const isOptional = param.questionToken ? '?' : '';
-            const hasDefault = param.initializer ? ' (optional)' : '';
-            
-            // Try to get JSDoc comment for this parameter
-            const jsDoc = methodDeclaration.jsDoc?.[0];
-            let paramComment = '';
-            if (jsDoc && jsDoc.tags) {
-                const paramTag = jsDoc.tags.find(tag => 
-                    tag.tagName?.escapedText === 'param' && 
-                    (tag.name?.escapedText === paramName || tag.name?.getText?.() === paramName)
-                );
-                paramComment = paramTag ? ` - ${paramTag.comment || ''}` : '';
-            }
-            
-            doc += `- \`${paramName}${isOptional}: ${paramType}\`${hasDefault}${paramComment}\n`;
-        }
-        doc += `\n`;
-    }
-    
-    const jsDoc = methodDeclaration.jsDoc?.[0];
-    if (jsDoc && jsDoc.tags) {
-        const returnTag = jsDoc.tags.find(tag => tag.tagName?.escapedText === 'returns');
-        const throwsTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'throws');
-        const exampleTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'example');
-        
-        if (returnTag && returnTag.comment) {
-            doc += `**Returns:** ${returnTag.comment}\n\n`;
-        }
-        
-        if (throwsTags.length > 0) {
-            doc += `**Throws:**\n\n`;
-            for (const throwsTag of throwsTags) {
-                doc += `- ${throwsTag.comment}\n`;
-            }
-            doc += `\n`;
-        }
-        
-        if (exampleTags.length > 0) {
-            doc += `**Examples:**\n\n`;
-            for (const example of exampleTags) {
-                doc += `${example.comment}\n\n`;
-            }
-        }
-    }
-    
-    return doc;
-}
-
-/**
- * Generate documentation for variable declarations
- */
-function generateVariableDoc(declaration, typeString, checker, headingPrefix) {
-    return `**Value:** \`${typeString}\`\n\n`;
+function getMemberType(member, isStatic) {
+    const prefix = isStatic ? 'static ' : '';
+    const typeMap = {
+        [SyntaxKind.MethodDeclaration]: 'method',
+        [SyntaxKind.PropertyDeclaration]: 'property',
+        [SyntaxKind.GetAccessor]: 'getter',
+        [SyntaxKind.SetAccessor]: 'setter'
+    };
+    return prefix + (typeMap[member.kind] || 'member');
 }
 
 /**
@@ -419,8 +463,7 @@ function findNextHeadingBoundary(text, startPos, maxLevel) {
     
     let match;
     while ((match = headingRegex.exec(text)) !== null) {
-        const headingLevel = match[1].length;
-        if (headingLevel <= maxLevel) {
+        if (match[1].length <= maxLevel) {
             return match.index;
         }
     }
@@ -434,58 +477,44 @@ function findNextHeadingBoundary(text, startPos, maxLevel) {
  * @param {string} searchPhrase The phrase to search for in the README to mark sections for auto-generation
  * @returns {Promise<void>}
  */
-export async function updateReadme(readmePath, searchPhrase) {
+export function updateReadme(readmePath, searchPhrase) {
+    const readme = fs.readFileSync(readmePath, 'utf8');
     
-    const readme = await fs.readFile(readmePath, 'utf8');
-    
-    // Escape the search phrase for regex
     const escapedSearchPhrase = searchPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const markerRegex = new RegExp(
-        `(^(#{1,6})\\s+)?` +        // Optional preceding heading
-        `(.*?\n${escapedSearchPhrase}[ \`]*([^\`]+)[\`: ]*\\n)`, // Search phrase with source file
+        `(^(#{1,6})\\s+)?` +
+        `(.*?\n${escapedSearchPhrase}[ \`]*([^\`]+)[\`: ]*\\n)`,
         'gm'
     );
     
     let updatedReadme = readme;
-    let filesProcessed = 0;
-    
-    // Process all matches in reverse order to avoid index shifting issues
     const matches = Array.from(readme.matchAll(markerRegex)).reverse();
     
-    for (const match of matches) {
-        const [fullMatch, precedingHeadingLine, precedingHeadingLevel, beforeSearch, sourceFile] = match;
-        
-        // Determine the heading level for generated content
-        let baseHeadingLevel = 2; // Default to level 2
-        if (precedingHeadingLevel) {
-            baseHeadingLevel = precedingHeadingLevel.length;
-        }
-        
-        // Find the end of content to replace
-        const contentStart = match.index + fullMatch.length;
-        const contentEnd = findNextHeadingBoundary(readme, contentStart, baseHeadingLevel);
-        
-        // Generated content should be at least one level deeper
-        const contentHeadingLevel = baseHeadingLevel + 1;
-        const headingPrefix = '#'.repeat(contentHeadingLevel);
-        
-        console.log(`Generating docs for ${sourceFile} with heading level ${contentHeadingLevel}...`);
-        const newContent = await generateMarkdownDoc(sourceFile, headingPrefix);
-        
-        // Build the replacement text
-        const replacement = (precedingHeadingLine || '') + beforeSearch + newContent;
-        
-        // Replace the content between marker and next heading
-        updatedReadme = updatedReadme.substring(0, match.index) + replacement + updatedReadme.substring(contentEnd);
-        
-        filesProcessed++;
-    }
-    
-    if (filesProcessed === 0) {
+    if (matches.length === 0) {
         console.error(`Could not find any "${searchPhrase}" markers in ${readmePath}`);
         process.exit(1);
     }
     
-    await fs.writeFile(readmePath, updatedReadme);
-    console.log(`Updated documentation for ${filesProcessed} file(s) in ${readmePath}`);
+    for (const match of matches) {
+        const [fullMatch, , precedingHeadingLevel, beforeSearch, sourceFile] = match;
+        
+        const baseHeadingLevel = precedingHeadingLevel?.length || 2;
+        const contentStart = match.index + fullMatch.length;
+        const contentEnd = findNextHeadingBoundary(readme, contentStart, baseHeadingLevel);
+        
+        const headingPrefix = '#'.repeat(baseHeadingLevel + 1);
+        
+        console.log(`Generating docs for ${sourceFile} with heading level ${baseHeadingLevel + 1}...`);
+        const newContent = generateMarkdownDoc(sourceFile, headingPrefix);
+        
+        const replacement = (precedingHeadingLevel ? `${'#'.repeat(precedingHeadingLevel.length)} ` : '') + 
+                          beforeSearch + newContent;
+        
+        updatedReadme = updatedReadme.substring(0, match.index) + 
+                       replacement + 
+                       updatedReadme.substring(contentEnd);
+    }
+    
+    fs.writeFileSync(readmePath, updatedReadme);
+    console.log(`Updated documentation for ${matches.length} file(s) in ${readmePath}`);
 }

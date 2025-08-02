@@ -9,8 +9,8 @@
   },
   "scripts": {
     "start": "node readme-tsdoc.js",
-    "update-readme": "node readme-tsdoc.js",
-    "prepublishOnly": "npm run update-readme",
+    "readme-tsdoc": "node src/cli.js",
+    "prepublishOnly": "npm run readme-tsdoc",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [

@@ -3,10 +3,7 @@
 import { updateReadme } from './readme-tsdoc.js';
 
 const { readmePath, searchPhrase } = parseCommandLineArgs();
-updateReadme(readmePath, searchPhrase).catch(err => {
-    console.error('Error:', err);
-    process.exit(1);
-});
+updateReadme(readmePath, searchPhrase);
 
 /**
  * Parse command line arguments and return configuration
