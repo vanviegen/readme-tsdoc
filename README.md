@@ -72,7 +72,7 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 **Returns:** Generated markdown documentation
 
-### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L593)
+### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L595)
 
 Update README file with auto-generated TypeScript documentation
 
@@ -83,8 +83,8 @@ Update README file with auto-generated TypeScript documentation
 - `readmePath: any` - Path to the README file to update
 - `searchPhrase: any` - The phrase to search for in the README to mark sections for auto-generation
 - `repoUrl: any` - Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
-- `split: boolean` - Whether to split output into separate files for each declaration
- 
+- `split: any` - When true, generate split documentation with brief overview in main file and details in separate files
+
 ## Integrating with your build process
 
 Add to your `package.json`:
