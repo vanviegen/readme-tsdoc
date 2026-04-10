@@ -375,6 +375,7 @@ function generateTypeParameters(typeParameters, jsDoc = null) {
  * Generate parameters documentation
  */
 function generateParameters(declaration) {
+    if (!declaration.parameters.length) return '';
     let doc = '**Parameters:**\n\n';
     const jsDoc = declaration.jsDoc?.[0];
     
@@ -588,9 +589,10 @@ function findNextHeadingBoundary(text, startPos, maxLevel) {
  * @param {string} readmePath Path to the README file to update
  * @param {string} searchPhrase The phrase to search for in the README to mark sections for auto-generation
  * @param {string} [repoUrl] Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
+ * @param {boolean} [split] When true, generate split documentation with brief overview in main file and details in separate files
  * @returns {Promise<void>}
  */
-export function updateReadme(readmePath, searchPhrase, repoUrl) {
+export function updateReadme(readmePath, searchPhrase, repoUrl, split) {
     const readme = fs.readFileSync(readmePath, 'utf8');
     
     const escapedSearchPhrase = searchPhrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -618,8 +620,13 @@ export function updateReadme(readmePath, searchPhrase, repoUrl) {
         const headingPrefix = '#'.repeat(baseHeadingLevel + 1);
         
         console.log(`Generating docs for ${sourceFile} with heading level ${baseHeadingLevel + 1}...`);
-        const newContent = generateMarkdownDoc(sourceFile, headingPrefix, repoUrl);
-        
+        let newContent = generateMarkdownDoc(sourceFile, headingPrefix, repoUrl);
+
+        if (split) {
+            const outputDir = path.dirname(path.resolve(readmePath));
+            newContent = splitDocContent(newContent, headingPrefix, outputDir);
+        }
+
         const replacement = (precedingHeadingLevel ? `${'#'.repeat(precedingHeadingLevel.length)} ` : '') + 
                           beforeSearch + "\n" + newContent;
         
@@ -630,4 +637,199 @@ export function updateReadme(readmePath, searchPhrase, repoUrl) {
     
     fs.writeFileSync(readmePath, updatedReadme);
     console.log(`Updated documentation for ${matches.length} file(s) in ${readmePath}`);
+}
+
+/**
+ * Minimum number of characters of "detail" content (beyond heading + first paragraph)
+ * for a section to be worth splitting into a separate file.
+ */
+const SPLIT_THRESHOLD = 100;
+
+/**
+ * Split generated documentation into a brief main overview and separate detail files.
+ * @param {string} fullDoc The full generated markdown documentation
+ * @param {string} headingPrefix The heading prefix (e.g., '###')
+ * @param {string} outputDir Directory to write split files to
+ * @returns {string} The main overview content
+ */
+function splitDocContent(fullDoc, headingPrefix, outputDir) {
+    const headingLevel = headingPrefix.length;
+    const memberLevel = headingLevel + 1;
+
+    const topSections = splitMarkdownSections(fullDoc, headingLevel);
+
+    let mainContent = '';
+    const filesToWrite = [];
+    const usedFileNames = new Set();
+
+    for (const topSection of topSections) {
+        const exportName = extractSymbolName(topSection.headingLine);
+
+        // Check for member sub-sections (class/interface members)
+        const memberSections = splitMarkdownSections(topSection.content, memberLevel);
+
+        if (memberSections.length === 0) {
+            // Simple export (function, type, constant, etc.)
+            mainContent += processSplitSection(
+                topSection.fullText, topSection.headingLine, topSection.content,
+                [exportName], usedFileNames, filesToWrite
+            );
+        } else {
+            // Class/interface with members
+            // Class-level content: everything before the first member heading
+            const firstMemberPos = topSection.content.indexOf(memberSections[0].headingLine);
+            const classBody = topSection.content.substring(0, firstMemberPos).trimEnd();
+            const classFullText = topSection.headingLine + '\n\n' + classBody;
+
+            mainContent += processSplitSection(
+                classFullText.trimEnd() + '\n\n', topSection.headingLine, classBody,
+                [exportName], usedFileNames, filesToWrite
+            );
+
+            // Each member
+            for (const memberSection of memberSections) {
+                const memberName = extractMemberName(memberSection.headingLine);
+                mainContent += processSplitSection(
+                    memberSection.fullText, memberSection.headingLine, memberSection.content,
+                    [exportName, memberName], usedFileNames, filesToWrite
+                );
+            }
+        }
+    }
+
+    // Write all split files
+    for (const file of filesToWrite) {
+        const filePath = path.join(outputDir, file.name);
+        fs.writeFileSync(filePath, file.content);
+        console.log(`  Split: ${file.name}`);
+    }
+
+    return mainContent;
+}
+
+/**
+ * Process a single section for split mode: decide whether to inline or split.
+ * Returns the text to add to the main file.
+ */
+function processSplitSection(fullText, headingLine, body, namePath, usedFileNames, filesToWrite) {
+    const { summary, details } = extractSummaryAndDetails(body);
+
+    if (details.trim().length <= SPLIT_THRESHOLD) {
+        // Short enough to keep inline
+        return fullText.trimEnd() + '\n\n';
+    }
+
+    // Split to a separate file
+    const baseName = namePath.join('_') + '.md';
+    const fileName = getUniqueFileName(baseName, usedFileNames);
+
+    let main = makeSummaryHeading(headingLine, fileName) + '\n\n';
+    if (summary.trim()) {
+        main += summary.trim() + '\n\n';
+    }
+
+    filesToWrite.push({ name: fileName, content: fullText.trimEnd() + '\n' });
+    return main;
+}
+
+/**
+ * Split markdown text into sections at a specific heading level.
+ * @param {string} text The markdown text
+ * @param {number} headingLevel The heading level to split at (number of # characters)
+ * @returns {Array<{headingLine: string, content: string, fullText: string}>}
+ */
+function splitMarkdownSections(text, headingLevel) {
+    const regex = new RegExp(`^#{${headingLevel}} (?!#)`, 'gm');
+    const sections = [];
+    const starts = [];
+
+    let match;
+    while ((match = regex.exec(text)) !== null) {
+        starts.push(match.index);
+    }
+
+    for (let i = 0; i < starts.length; i++) {
+        const start = starts[i];
+        const end = i + 1 < starts.length ? starts[i + 1] : text.length;
+        const sectionText = text.substring(start, end).trimEnd();
+
+        const newlinePos = sectionText.indexOf('\n');
+        const headingLine = newlinePos === -1 ? sectionText : sectionText.substring(0, newlinePos);
+        const content = newlinePos === -1 ? '' : sectionText.substring(newlinePos + 1).replace(/^\n+/, '');
+
+        sections.push({ headingLine, content, fullText: sectionText });
+    }
+
+    return sections;
+}
+
+/**
+ * Extract the symbol name from a heading line.
+ * E.g., "### processValue · [function](url)" -> "processValue"
+ */
+function extractSymbolName(headingLine) {
+    const content = headingLine.replace(/^#+\s+/, '');
+    const nameEnd = content.indexOf(' · ');
+    return nameEnd === -1 ? content.trim() : content.substring(0, nameEnd);
+}
+
+/**
+ * Extract the member name (after the dot) from a member heading line.
+ * E.g., "#### dataProcessor.batchSize · [getter](url)" -> "batchSize"
+ */
+function extractMemberName(headingLine) {
+    const symbolName = extractSymbolName(headingLine);
+    const dotPos = symbolName.lastIndexOf('.');
+    return dotPos === -1 ? symbolName : symbolName.substring(dotPos + 1);
+}
+
+/**
+ * Replace the symbol name in a heading with a markdown link to the split file.
+ * E.g., "### processValue · [function](url)" -> "### [processValue](processValue.md) · [function](url)"
+ */
+function makeSummaryHeading(headingLine, fileName) {
+    const name = extractSymbolName(headingLine);
+    return headingLine.replace(name, `[${name}](${fileName})`);
+}
+
+/**
+ * Extract the first paragraph (summary) and remaining details from section body content.
+ * The first paragraph is text before the first blank line or first bold marker (**).
+ */
+function extractSummaryAndDetails(body) {
+    const lines = body.split('\n');
+
+    // Skip leading blank lines
+    let firstParaStart = 0;
+    while (firstParaStart < lines.length && lines[firstParaStart].trim() === '') firstParaStart++;
+
+    // Take paragraph lines until blank line or bold marker
+    let firstParaEnd = firstParaStart;
+    while (firstParaEnd < lines.length && lines[firstParaEnd].trim() !== '' && !lines[firstParaEnd].startsWith('**')) {
+        firstParaEnd++;
+    }
+
+    const summary = lines.slice(firstParaStart, firstParaEnd).join('\n');
+    const details = lines.slice(firstParaEnd).join('\n');
+
+    return { summary, details };
+}
+
+/**
+ * Get a unique file name, appending _2, _3, etc. on collision.
+ */
+function getUniqueFileName(baseName, usedNames) {
+    if (!usedNames.has(baseName)) {
+        usedNames.add(baseName);
+        return baseName;
+    }
+    let counter = 2;
+    while (true) {
+        const name = baseName.replace('.md', `_${counter}.md`);
+        if (!usedNames.has(name)) {
+            usedNames.add(name);
+            return name;
+        }
+        counter++;
+    }
 }

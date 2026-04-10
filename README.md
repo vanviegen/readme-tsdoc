@@ -41,6 +41,7 @@ npx readme-tsdoc [options]
 - `--file <filename>`: Specify README file to update (default: `README.md`)
 - `--search <phrase>`: Custom search phrase (default: `"The following is auto-generated from"`)
 - `--repo-url <url>`: Optional repository (GitHub or GitLab) URL for generating deep links to source code (e.g., `https://github.com/username/repo`)
+- `--split`: Make the primary output an overview document, with links to separate markdown files for each method/function/class/etc containing details.
 
 **Examples:**
 ```bash
@@ -75,14 +76,15 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 Update README file with auto-generated TypeScript documentation
 
-**Signature:** `(readmePath: string, searchPhrase: string, repoUrl?: string) => Promise<void>`
+**Signature:** `(readmePath: string, searchPhrase: string, repoUrl?: string, split?: boolean) => Promise<void>`
 
 **Parameters:**
 
 - `readmePath: any` - Path to the README file to update
 - `searchPhrase: any` - The phrase to search for in the README to mark sections for auto-generation
 - `repoUrl: any` - Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
-
+- `split: boolean` - Whether to split output into separate files for each declaration
+ 
 ## Integrating with your build process
 
 Add to your `package.json`:

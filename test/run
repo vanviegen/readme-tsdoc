@@ -61,7 +61,6 @@ fi
 # Use diff with color if available
 if diff "$EXPECTED_FILE" "$ACTUAL_FILE" > /dev/null 2>&1; then
     echo -e "${GREEN}✓ Test passed - output matches expected results${NC}"
-    exit 0
 else
     echo -e "${RED}✗ Test failed - output differs from expected results${NC}"
     echo ""
@@ -71,6 +70,39 @@ else
     echo -e "$YELLOW"
     echo "To update the expected output (if the changes are correct):"
     echo "  cp $ACTUAL_FILE $EXPECTED_FILE"
+    echo -e "$NC"
+
+    exit 1
+fi
+
+# --- Split mode test ---
+
+SPLIT_INPUT="test/split-input.md"
+SPLIT_OUTPUT_DIR="test/split-output"
+SPLIT_EXPECTED_DIR="test/split-expected"
+
+# Recreate output dir from the input template
+rm -rf "$SPLIT_OUTPUT_DIR"
+mkdir "$SPLIT_OUTPUT_DIR"
+cp "$SPLIT_INPUT" "$SPLIT_OUTPUT_DIR/split-output.md"
+
+# Run with --split
+node src/cli.js \
+    --file "$SPLIT_OUTPUT_DIR/split-output.md" \
+    --split
+
+if diff -r "$SPLIT_EXPECTED_DIR" "$SPLIT_OUTPUT_DIR" > /dev/null 2>&1; then
+    echo -e "${GREEN}✓ Split test passed - output matches expected results${NC}"
+    exit 0
+else
+    echo -e "${RED}✗ Split test failed - output differs from expected results${NC}"
+    echo ""
+
+    diff -ru --color=always "$SPLIT_EXPECTED_DIR" "$SPLIT_OUTPUT_DIR" || true
+
+    echo -e "$YELLOW"
+    echo "To update the expected split output (if the changes are correct):"
+    echo "  rm -rf $SPLIT_EXPECTED_DIR && cp -r $SPLIT_OUTPUT_DIR $SPLIT_EXPECTED_DIR"
     echo -e "$NC"
 
     exit 1

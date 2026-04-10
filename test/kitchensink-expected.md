@@ -191,9 +191,6 @@ Create a new processor instance with default configuration
 
 **Signature:** `() => DataProcessor<string, string[]>`
 
-**Parameters:**
-
-
 **Returns:** A new DataProcessor instance
 
 **Examples:**
@@ -207,9 +204,6 @@ const processor = DataProcessor.createDefault();
 Reset all static counters and configuration
 
 **Signature:** `() => void`
-
-**Parameters:**
-
 
 #### dataProcessor.name · [property](https://github.com/me/example/blob/main/test/kitchensink.ts#L58)
 
@@ -234,9 +228,6 @@ Configuration options for this processor
 Initialize the processor
 
 **Signature:** `() => Promise<void>`
-
-**Parameters:**
-
 
 **Returns:** A promise that resolves when initialization is complete
 
@@ -301,17 +292,11 @@ Clear all stored items
 
 **Signature:** `() => void`
 
-**Parameters:**
-
-
 #### dataProcessor.process · [method](https://github.com/me/example/blob/main/test/kitchensink.ts#L158)
 
 Process method required by TestInterface
 
 **Signature:** `() => Promise<void>`
-
-**Parameters:**
-
 
 **Returns:** A promise that resolves when processing is complete
 
@@ -320,9 +305,6 @@ Process method required by TestInterface
 Abstract method for cleanup
 
 **Signature:** `() => Promise<void>`
-
-**Parameters:**
-
 
 ### StringDataProcessor · [class](https://github.com/me/example/blob/main/test/kitchensink.ts#L173)
 
@@ -356,9 +338,6 @@ Process string data by applying the transformer
 Clean up resources
 
 **Signature:** `() => Promise<void>`
-
-**Parameters:**
-
 
 ### KITCHEN_SINK_CONFIG · [constant](https://github.com/me/example/blob/main/test/kitchensink.ts#L341)
 

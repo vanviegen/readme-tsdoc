@@ -1,6 +1,6 @@
 {
   "name": "readme-tsdoc",
-  "version": "1.1.4",
+  "version": "1.1.5",
   "description": "Automatically generate TypeScript documentation and insert it into your README.md file",
   "main": "src/readme-tsdoc.js",
   "type": "module",
@@ -26,8 +26,10 @@
     "node": ">=16.0.0"
   },
   "dependencies": {
-    "fast-deep-copy": "^1.0.1",
     "typescript": "^5.0.0"
+  },
+  "devDependencies": {
+    "fast-deep-copy": "^1.0.1"
   },
   "files": [
     "src",

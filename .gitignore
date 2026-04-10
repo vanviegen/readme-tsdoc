@@ -1,2 +1,3 @@
 node_modules
 test/kitchensink-output.md
+test/split-output/
