@@ -92,7 +92,7 @@ function generateSymbolDoc(name, symbol, checker, headingPrefix, sourceFile, rep
     // This allows re-export JSDoc to override the original documentation
     const jsDocObject = extractJSDoc(exportDeclaration) || extractJSDoc(declaration);
     if (jsDocObject?.comment) {
-        doc += `${jsDocObject.comment}\n\n`;
+        doc += `${commentToString(jsDocObject.comment)}\n\n`;
     }
     
     doc += generateTypeSpecificDoc(declaration, typeInfo, checker, headingPrefix, name, sourceFile, repoUrl, jsDocObject);
@@ -222,6 +222,29 @@ function isConst(declaration) {
 }
 
 /**
+ * Convert a JSDoc comment value to a plain string.
+ * The TypeScript compiler API returns jsDoc.comment as either a string or an
+ * array of JSDocText/JSDocLink nodes (when inline tags like {@link} are present).
+ * @param {string | import('typescript').NodeArray<any> | undefined} comment
+ * @returns {string}
+ */
+function commentToString(comment) {
+    if (!comment) return '';
+    if (typeof comment === 'string') return comment;
+    // Array of JSDocComment nodes
+    return comment.map(node => {
+        if (typeof node === 'string') return node;
+        if (node.text !== undefined) return node.text;
+        // JSDocLink node: render as plain text (name only, no URL resolution)
+        if (node.name) {
+            const name = typeof node.name === 'string' ? node.name : (node.name.getText?.() ?? String(node.name));
+            return name;
+        }
+        return '';
+    }).join('');
+}
+
+/**
  * Extract JSDoc object from a declaration
  */
 function extractJSDoc(declaration) {
@@ -320,7 +343,7 @@ function generateJSDocBasedFunctionDoc(jsDoc) {
         doc += '**Parameters:**\n\n';
         for (const tag of paramTags) {
             const name = tag.name?.escapedText || tag.name?.getText?.() || 'unknown';
-            const comment = tag.comment || '';
+            const comment = commentToString(tag.comment);
             doc += `- \`${name}\` - ${comment}\n`;
         }
         doc += '\n';
@@ -348,7 +371,7 @@ function generateTypeParameters(typeParameters, jsDoc = null) {
             // Match by position since @template tags don't have explicit parameter names
             if (templateIndex < templateTags.length) {
                 const templateTag = templateTags[templateIndex];
-                const comment = templateTag.comment || '';
+                const comment = commentToString(templateTag.comment);
                 // Remove leading "- " if present
                 const cleanComment = comment.startsWith('- ') ? comment.substring(2) : comment;
                 templateDocs.set(paramName, cleanComment);
@@ -392,7 +415,7 @@ function generateParameters(declaration) {
                 tag.tagName?.escapedText === 'param' && 
                 (tag.name?.escapedText === name || tag.name?.getText?.() === name)
             );
-            comment = paramTag?.comment ? ` - ${paramTag.comment}` : '';
+            comment = paramTag?.comment ? ` - ${commentToString(paramTag.comment)}` : '';
         }
         
         doc += `- \`${name}${isOptional}: ${type}\`${hasDefault}${comment}\n`;
@@ -411,20 +434,20 @@ function generateJSDocTags(jsDoc) {
     
     const returnTag = jsDoc.tags.find(tag => tag.tagName?.escapedText === 'returns');
     if (returnTag?.comment) {
-        doc += `**Returns:** ${returnTag.comment}\n\n`;
+        doc += `**Returns:** ${commentToString(returnTag.comment)}\n\n`;
     }
     
     const throwsTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'throws');
     if (throwsTags.length > 0) {
         doc += '**Throws:**\n\n';
-        throwsTags.forEach(tag => doc += `- ${tag.comment}\n`);
+        throwsTags.forEach(tag => doc += `- ${commentToString(tag.comment)}\n`);
         doc += '\n';
     }
     
     const exampleTags = jsDoc.tags.filter(tag => tag.tagName?.escapedText === 'example');
     if (exampleTags.length > 0) {
         doc += '**Examples:**\n\n';
-        exampleTags.forEach(tag => doc += `${tag.comment}\n\n`);
+        exampleTags.forEach(tag => doc += `${commentToString(tag.comment)}\n\n`);
     }
     
     return doc;
@@ -462,7 +485,7 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
             doc += '**Constructor Parameters:**\n\n';
             paramTags.forEach(tag => {
                 const name = tag.name?.escapedText || tag.name?.getText?.() || 'unknown';
-                doc += `- \`${name}\`: ${tag.comment || ''}\n`;
+                doc += `- \`${name}\`: ${commentToString(tag.comment)}\n`;
             });
             doc += '\n';
         }
@@ -511,7 +534,7 @@ function generateClassMemberDoc(member, checker, isStatic, headingPrefix, classN
     
     const jsDocObject = extractJSDoc(member);
     if (jsDocObject?.comment) {
-        doc += `${jsDocObject.comment}\n\n`;
+        doc += `${commentToString(jsDocObject.comment)}\n\n`;
     }
     
     try {
@@ -532,7 +555,7 @@ function generateClassMemberDoc(member, checker, isStatic, headingPrefix, classN
                     );
                     if (exampleTags.length > 0) {
                         doc += '**Examples:**\n\n';
-                        exampleTags.forEach(tag => doc += `${tag.comment}\n\n`);
+                        exampleTags.forEach(tag => doc += `${commentToString(tag.comment)}\n\n`);
                     }
                 }
             }
