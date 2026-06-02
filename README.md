@@ -72,7 +72,7 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 **Returns:** Generated markdown documentation
 
-### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L595)
+### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L618)
 
 Update README file with auto-generated TypeScript documentation
 

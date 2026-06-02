@@ -117,12 +117,6 @@ Abstract method for cleanup
 
 A concrete implementation of DataProcessor for string data
 
-#### stringDataProcessor.transformer · property
-
-Transform function applied to each string
-
-**Type:** `(s: string) => string`
-
 #### [stringDataProcessor.processData](StringDataProcessor_processData.md) · method
 
 Process string data by applying the transformer

@@ -315,12 +315,6 @@ A concrete implementation of DataProcessor for string data
 - `name`: The processor name
 - `transformer`: Optional transform function (default: uppercase)
 
-#### stringDataProcessor.transformer · [property](https://github.com/me/example/blob/main/test/kitchensink.ts#L177)
-
-Transform function applied to each string
-
-**Type:** `(s: string) => string`
-
 #### stringDataProcessor.processData · [method](https://github.com/me/example/blob/main/test/kitchensink.ts#L194)
 
 Process string data by applying the transformer

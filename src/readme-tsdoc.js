@@ -494,18 +494,13 @@ function generateClassDoc(declaration, typeString, checker, headingPrefix, class
     // Document class members
     const members = declaration.members || [];
     const publicMembers = members.filter(m => 
+        !m.modifiers?.some(mod => mod.kind === SyntaxKind.PrivateKeyword) &&
         !m.name?.getText().startsWith('_') && m.kind !== SyntaxKind.Constructor
     );
     
-    const staticMembers = publicMembers.filter(m => 
-        m.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword)
-    );
-    const instanceMembers = publicMembers.filter(m => 
-        !m.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword)
-    );
-    
-    [...staticMembers, ...instanceMembers].forEach(member => {
-        doc += generateClassMemberDoc(member, checker, staticMembers.includes(member), headingPrefix, className, sourceFile, repoUrl);
+    publicMembers.forEach(member => {
+        const isStatic = member.modifiers?.some(mod => mod.kind === SyntaxKind.StaticKeyword);
+        doc += generateClassMemberDoc(member, checker, isStatic, headingPrefix, className, sourceFile, repoUrl);
     });
     
     return doc;
