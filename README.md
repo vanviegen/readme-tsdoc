@@ -38,18 +38,28 @@ npx readme-tsdoc [options]
 ```
 
 **Options:**
-- `--file <filename>`: Specify README file to update (default: `README.md`)
-- `--search <phrase>`: Custom search phrase (default: `"The following is auto-generated from"`)
-- `--repo-url <url>`: Optional repository (GitHub or GitLab) URL for generating deep links to source code (e.g., `https://github.com/username/repo`)
+- `--file <path>`: README file to update (default: `README.md`). When used with `--create`, specifies the output file.
+- `--search <phrase>`: Custom search phrase (default: `"The following is auto-generated from"`).
+- `--create <source>`: TypeScript source file; generate reference docs and write them to `--file`. Mutually exclusive with `--search`.
+- `--repo-url <url>`: Optional repository (GitHub or GitLab) URL for generating deep links to source code (e.g., `https://github.com/username/repo`).
 - `--split`: Make the primary output an overview document, with links to separate markdown files for each method/function/class/etc containing details.
+
+There are two modes:
+
+**Update mode** (default): reads `--file`, searches for marker phrases like `"The following is auto-generated from \`FILENAME\`"`, and replaces the following section with generated documentation. Heading levels are adjusted to match the surrounding content.
+
+**Create mode** (`--create <source>`): generates reference documentation directly from the given TypeScript source file and writes it to `--file`, overwriting any existing content. `--file` is required in this mode.
 
 **Examples:**
 ```bash
-# Update custom file
-npx readme-tsdoc --file docs/api.md
+# Update markers in README.md (default)
+npx readme-tsdoc
 
-# Use custom search phrase
-npx readme-tsdoc --search "Auto-generated docs from" --repo-url "https://github.com/jdoe/my-repo"
+# Update markers in a different file
+npx readme-tsdoc --file docs/api.md --search "Auto-generated docs from" --repo-url "https://github.com/jdoe/my-repo"
+
+# Create a standalone reference doc from a source file, split into per-symbol files
+npx readme-tsdoc --file docs/api-reference.md --create src/index.ts --split
 ```
 
 ## Programmatic Usage
