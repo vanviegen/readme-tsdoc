@@ -363,7 +363,7 @@ export const ProcessingMode = {
 } as const;
 
 /**
- * Type for processing modes
+ * Type for processing modes, derived from {@link ProcessingMode}.
  */
 export type ProcessingModeType = typeof ProcessingMode[keyof typeof ProcessingMode];
 

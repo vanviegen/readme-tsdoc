@@ -234,12 +234,12 @@ function commentToString(comment) {
     // Array of JSDocComment nodes
     return comment.map(node => {
         if (typeof node === 'string') return node;
-        if (node.text !== undefined) return node.text;
-        // JSDocLink node: render as plain text (name only, no URL resolution)
+        // JSDocLink node: has a `name` property for the linked symbol and `text` for optional display text
         if (node.name) {
             const name = typeof node.name === 'string' ? node.name : (node.name.getText?.() ?? String(node.name));
-            return name;
+            return node.text?.trim() ? node.text.trim() : `\`${name}\``;
         }
+        if (node.text !== undefined) return node.text;
         return '';
     }).join('');
 }
@@ -714,25 +714,11 @@ function splitDocContent(fullDoc, headingPrefix, outputDir) {
                 [exportName], usedFileNames, filesToWrite
             );
         } else {
-            // Class/interface with members
-            // Class-level content: everything before the first member heading
-            const firstMemberPos = topSection.content.indexOf(memberSections[0].headingLine);
-            const classBody = topSection.content.substring(0, firstMemberPos).trimEnd();
-            const classFullText = topSection.headingLine + '\n\n' + classBody;
-
+            // Class/interface with members - treat whole section as one unit
             mainContent += processSplitSection(
-                classFullText.trimEnd() + '\n\n', topSection.headingLine, classBody,
+                topSection.fullText, topSection.headingLine, topSection.content,
                 [exportName], usedFileNames, filesToWrite
             );
-
-            // Each member
-            for (const memberSection of memberSections) {
-                const memberName = extractMemberName(memberSection.headingLine);
-                mainContent += processSplitSection(
-                    memberSection.fullText, memberSection.headingLine, memberSection.content,
-                    [exportName, memberName], usedFileNames, filesToWrite
-                );
-            }
         }
     }
 
