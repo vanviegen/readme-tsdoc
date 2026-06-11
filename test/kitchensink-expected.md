@@ -347,7 +347,7 @@ A simple enum-like constant object
 
 ### ProcessingModeType · [type](https://github.com/me/example/blob/main/test/kitchensink.ts#L368)
 
-Type for processing modes
+Type for processing modes, derived from `ProcessingMode`.
 
 **Type:** `typeof ProcessingMode[keyof typeof ProcessingMode]`
 
