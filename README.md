@@ -38,18 +38,28 @@ npx readme-tsdoc [options]
 ```
 
 **Options:**
-- `--file <filename>`: Specify README file to update (default: `README.md`)
-- `--search <phrase>`: Custom search phrase (default: `"The following is auto-generated from"`)
-- `--repo-url <url>`: Optional repository (GitHub or GitLab) URL for generating deep links to source code (e.g., `https://github.com/username/repo`)
+- `--file <path>`: README file to update (default: `README.md`). When used with `--create`, specifies the output file.
+- `--search <phrase>`: Custom search phrase (default: `"The following is auto-generated from"`).
+- `--create <source>`: TypeScript source file; generate reference docs and write them to `--file`. Mutually exclusive with `--search`.
+- `--repo-url <url>`: Optional repository (GitHub or GitLab) URL for generating deep links to source code (e.g., `https://github.com/username/repo`).
 - `--split`: Make the primary output an overview document, with links to separate markdown files for each method/function/class/etc containing details.
+
+There are two modes:
+
+**Update mode** (default): reads `--file`, searches for marker phrases like `"The following is auto-generated from \`FILENAME\`"`, and replaces the following section with generated documentation. Heading levels are adjusted to match the surrounding content.
+
+**Create mode** (`--create <source>`): generates reference documentation directly from the given TypeScript source file and writes it to `--file`, overwriting any existing content. `--file` is required in this mode.
 
 **Examples:**
 ```bash
-# Update custom file
-npx readme-tsdoc --file docs/api.md
+# Update markers in README.md (default)
+npx readme-tsdoc
 
-# Use custom search phrase
-npx readme-tsdoc --search "Auto-generated docs from" --repo-url "https://github.com/jdoe/my-repo"
+# Update markers in a different file
+npx readme-tsdoc --file docs/api.md --search "Auto-generated docs from" --repo-url "https://github.com/jdoe/my-repo"
+
+# Create a standalone reference doc from a source file, split into per-symbol files
+npx readme-tsdoc --file docs/api-reference.md --create src/index.ts --split
 ```
 
 ## Programmatic Usage
@@ -58,7 +68,7 @@ You can also use readme-tsdoc from your own code. The following docs are generat
 
 The following is auto-generated from `src/readme-tsdoc.js`:
 
-### generateMarkdownDoc · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L24)
+### generateMarkdownDoc · function
 
 Generate markdown documentation for a TypeScript file using TypeScript compiler API
 
@@ -72,7 +82,7 @@ Generate markdown documentation for a TypeScript file using TypeScript compiler 
 
 **Returns:** Generated markdown documentation
 
-### updateReadme · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/src/readme-tsdoc.js#L618)
+### updateReadme · function
 
 Update README file with auto-generated TypeScript documentation
 
@@ -84,6 +94,19 @@ Update README file with auto-generated TypeScript documentation
 - `searchPhrase: any` - The phrase to search for in the README to mark sections for auto-generation
 - `repoUrl: any` - Optional repository URL for generating deep links (e.g., 'https://github.com/vanviegen/readme-tsdoc')
 - `split: any` - When true, generate split documentation with brief overview in main file and details in separate files
+
+### createDocs · function
+
+Generate reference documentation for a TypeScript source file and write it to an output file.
+
+**Signature:** `(sourcePath: string, outputPath: string, repoUrl?: string, split?: boolean) => void`
+
+**Parameters:**
+
+- `sourcePath: any` - Path to the TypeScript source file
+- `outputPath: any` - Path to the output file (will be overwritten)
+- `repoUrl: any` - Optional repository URL for generating deep links
+- `split: any` - When true, split documentation into multiple files
 
 ## Integrating with your build process
 
@@ -104,7 +127,7 @@ This ensures your documentation is always up-to-date before publishing.
 
 The following is auto-generated from `test/demo.ts`:
 
-### celsiusToFahrenheit · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L86)
+### celsiusToFahrenheit · function
 
 Convert temperature between Celsius and Fahrenheit
 
@@ -123,7 +146,7 @@ const fahrenheit = celsiusToFahrenheit(25);
 console.log(fahrenheit); // 77
 ```
 
-### findMax · [function](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L120)
+### findMax · function
 
 Generic function to find the maximum value in an array
 
@@ -148,7 +171,7 @@ const max = findMax(numbers, (a, b) => a - b);
 console.log(max); // 9
 ```
 
-### MathUtils · [class](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L4)
+### MathUtils · class
 
 A utility class for mathematical operations and calculations
 
@@ -156,7 +179,7 @@ A utility class for mathematical operations and calculations
 
 - `precision`: Number of decimal places for rounding (default: 2)
 
-#### MathUtils.PI · [static property](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L12)
+#### MathUtils.PI · static property
 
 The mathematical constant PI
 
@@ -168,7 +191,7 @@ The mathematical constant PI
 console.log(MathUtils.PI); // 3.141592653589793
 ```
 
-#### MathUtils.circleArea · [static method](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L25)
+#### MathUtils.circleArea · static method
 
 Calculate the area of a circle
 
@@ -191,13 +214,13 @@ const area = MathUtils.circleArea(5);
 console.log(area); // 78.53981633974483
 ```
 
-#### mathUtils.precision · [property](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L35)
+#### mathUtils.precision · property
 
 Current calculation precision for rounding operations
 
 **Type:** `number`
 
-#### mathUtils.round · [method](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L56)
+#### mathUtils.round · method
 
 Round a number to the specified precision
 
@@ -217,25 +240,25 @@ const rounded = math.round(3.14159);
 console.log(rounded); // 3.142
 ```
 
-#### mathUtils.currentPrecision · [getter](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L64)
+#### mathUtils.currentPrecision · getter
 
 Get the current precision setting
 
 **Type:** `number`
 
-#### mathUtils.currentPrecision · [setter](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L71)
+#### mathUtils.currentPrecision · setter
 
 Set a new precision value
 
 **Type:** `number`
 
-### SPEED_OF_LIGHT · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L93)
+### SPEED_OF_LIGHT · constant
 
 A constant representing the speed of light in vacuum (m/s)
 
 **Value:** `299792458`
 
-### CONFIG · [constant](https://github.com/vanviegen/readme-tsdoc/blob/main/test/demo.ts#L98)
+### CONFIG · constant
 
 Configuration object for mathematical operations
 
