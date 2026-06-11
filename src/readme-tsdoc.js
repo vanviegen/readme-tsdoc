@@ -658,6 +658,27 @@ export function updateReadme(readmePath, searchPhrase, repoUrl, split) {
 }
 
 /**
+ * Generate reference documentation for a TypeScript source file and write it to an output file.
+ * @param {string} sourcePath Path to the TypeScript source file
+ * @param {string} outputPath Path to the output file (will be overwritten)
+ * @param {string} [repoUrl] Optional repository URL for generating deep links
+ * @param {boolean} [split] When true, split documentation into multiple files
+ */
+export function createDocs(sourcePath, outputPath, repoUrl, split) {
+    const headingPrefix = '##';
+    console.log(`Generating docs for ${sourcePath}...`);
+    let content = generateMarkdownDoc(sourcePath, headingPrefix, repoUrl);
+
+    if (split) {
+        const outputDir = path.dirname(path.resolve(outputPath));
+        content = splitDocContent(content, headingPrefix, outputDir);
+    }
+
+    fs.writeFileSync(outputPath, content);
+    console.log(`Created ${outputPath}`);
+}
+
+/**
  * Minimum number of characters of "detail" content (beyond heading + first paragraph)
  * for a section to be worth splitting into a separate file.
  */
